@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradeLog — Journal</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:200;align-items:center;justify-content:center">
+  <div style="width:380px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px">
+    <div style="font-family:var(--mono);font-size:20px;font-weight:700;margin-bottom:4px">Trade<span style="color:var(--green)">Log</span></div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:28px;letter-spacing:0.5px">Your personal trading journal</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Email</div>
+        <input id="auth-email" type="email" placeholder="you@email.com" class="form-input" style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Password</div>
+        <input id="auth-pass" type="password" placeholder="••••••••" class="form-input" style="width:100%" onkeydown="if(event.key==='Enter')sbSignIn()">
+      </div>
+      <div id="auth-msg" style="font-size:11px;min-height:16px"></div>
+      <button class="btn btn-primary" onclick="sbSignIn()" style="width:100%;padding:10px">Sign In</button>
+      <button class="btn btn-ghost" onclick="sbSignUp()" style="width:100%;padding:10px">Create Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING BAR -->
+<div id="loading-bar" style="display:none;position:fixed;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--blue));z-index:300;animation:loadpulse 1s ease-in-out infinite"></div>
+
+<div id="app-shell" style="display:none" class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-text">Trade<span>Log</span></div>
+      <div class="logo-sub">Journal & Analytics</div>
+    </div>
+
+    <div class="currency-toggle">
+      <button class="active" onclick="setCurrency('USD',this)">$ USD</button>
+      <button onclick="setCurrency('INR',this)">₹ INR</button>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-section">Trading</div>
+      <div class="nav-item active" onclick="showPage('dashboard',this)">
+        <span class="icon">◉</span> Dashboard
+      </div>
+      <div class="nav-item" onclick="showPage('trades',this)">
+        <span class="icon">⇄</span> Trade Log
+      </div>
+      <div class="nav-item" onclick="showPage('analytics',this)">
+        <span class="icon">◈</span> Analytics
+      </div>
+      <div class="nav-section" style="margin-top:8px">Investing</div>
+      <div class="nav-item" onclick="showPage('investing',this)">
+        <span class="icon">◆</span> Portfolio
+      </div>
+      <div class="nav-item" onclick="showPage('equity',this)">
+        <span class="icon">↗</span> Equity Curve
+      </div>
+      <div class="nav-section" style="margin-top:8px">Tools</div>
+      <div class="nav-item" onclick="showPage('calendar',this)">
+        <span class="icon">▦</span> P&L Calendar
+      </div>
+      <div class="nav-item" onclick="showPage('query',this)">
+        <span class="icon">⌖</span> Query Builder
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="total-equity">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div class="total-equity-label">Portfolio Value</div>
+          <button id="hide-balance-btn" onclick="toggleBalanceVisibility()" title="Hide/show balances"
+            style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:4px;line-height:1"
+            onmouseenter="this.style.color='var(--text)'" onmouseleave="this.style.color='var(--muted)'">👁</button>
+        </div>
+        <div class="total-equity-val balance-val" id="sidebar-equity">—</div>
+        <div class="total-equity-change" id="sidebar-change">Loading…</div>
+      </div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px">
+        <button onclick="openProfileModal_internal()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 4px;border-radius:4px;flex-shrink:0;line-height:1" onmouseenter="this.style.color='var(--text)'" onmouseleave="this.style.color='var(--muted)'" title="Edit profile">◉</button>
+        <div style="flex:1;min-width:0">
+          <div id="sidebar-name" style="font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+          <div id="user-email" style="display:none;font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+        </div>
+        <button onclick="sbSignOut()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:10px;padding:3px 6px;border-radius:4px;flex-shrink:0" onmouseenter="this.style.color='var(--red)'" onmouseleave="this.style.color='var(--muted)'">Sign out</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="page-title">Dashboard</div>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost" onclick="exportCSV()" style="font-size:11px">↓ Export CSV</button>
+        <button class="btn btn-ghost" onclick="openAddInvestment()">+ Add Investment</button>
+        <button class="btn btn-primary" onclick="openAddTrade()">+ Log Trade</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- DASHBOARD PAGE -->
+      <div class="page active" id="page-dashboard">
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-label">Total P&L</div>
+            <div class="stat-val green" id="stat-pnl">—</div>
+            <div class="stat-sub" id="stat-pnl-sub">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Win Rate</div>
+            <div class="stat-val green" id="stat-winrate">—</div>
+            <div class="stat-sub" id="stat-winrate-sub">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Avg RR Achieved</div>
+            <div class="stat-val blue" id="stat-rr">—</div>
+            <div class="stat-sub" id="stat-rr-sub">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Expectancy</div>
+            <div class="stat-val" id="stat-expect">—</div>
+            <div class="stat-sub">Per trade avg</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Best Trade</div>
+            <div class="stat-val green" id="stat-best">—</div>
+            <div class="stat-sub" id="stat-best-sym">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Worst Trade</div>
+            <div class="stat-val red" id="stat-worst">—</div>
+            <div class="stat-sub" id="stat-worst-sym">—</div>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-header">
+              <div class="chart-title">Equity Curve — Trading</div>
+              <div class="chart-meta" id="eq-meta">—</div>
+            </div>
+            <div class="chart-wrap" style="height:200px">
+              <canvas id="equityChart"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <div class="chart-title">Win / Loss Split</div>
+              <div class="chart-meta" id="wl-meta">—</div>
+            </div>
+            <div class="chart-wrap" style="height:200px">
+              <canvas id="winLossChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Monthly Heatmap -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">Monthly P&L Heatmap</div>
+            <div class="chart-meta">Hover for details</div>
+          </div>
+          <div class="hm-months">
+            <div class="hm-month">JAN</div><div class="hm-month">FEB</div><div class="hm-month">MAR</div>
+            <div class="hm-month">APR</div><div class="hm-month">MAY</div><div class="hm-month">JUN</div>
+            <div class="hm-month">JUL</div><div class="hm-month">AUG</div><div class="hm-month">SEP</div>
+            <div class="hm-month">OCT</div><div class="hm-month">NOV</div><div class="hm-month">DEC</div>
+          </div>
+          <div class="heatmap-grid" id="heatmap"></div>
+        </div>
+
+        <!-- Recent Trades -->
+        <div class="table-card">
+          <div class="table-header">
+            <div class="table-title" id="recent-trades-title">This Month's Trades</div>
+            <div class="table-filters">
+              <button class="filter-btn active" onclick="filterRecent('All',this)">All</button>
+              <button class="filter-btn" onclick="filterRecent('Crypto',this)">Crypto</button>
+              <button class="filter-btn" onclick="filterRecent('Forex',this)">Forex</button>
+              <button class="filter-btn" onclick="filterRecent('Stocks',this)">Stocks</button>
+            </div>
+          </div>
+          <div style="max-height:340px;overflow-y:auto">
+            <table>
+              <thead style="position:sticky;top:0;background:var(--surface);z-index:1">
+                <tr>
+                  <th>Date</th><th>Symbol</th><th>Type</th><th>Direction</th>
+                  <th>Entry</th><th>Exit</th><th>P&L</th><th>RR</th><th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="recent-trades-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TRADE LOG PAGE -->
+      <div class="page" id="page-trades">
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-label">Total Trades</div>
+            <div class="stat-val" id="tl-total">—</div>
+            <div class="stat-sub" id="tl-total-sub">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Profit Factor</div>
+            <div class="stat-val green" id="tl-pf">—</div>
+            <div class="stat-sub">Gross win / gross loss</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Avg Win</div>
+            <div class="stat-val green" id="tl-avgwin">—</div>
+            <div class="stat-sub">Closed winners</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Avg Loss</div>
+            <div class="stat-val red" id="tl-avgloss">—</div>
+            <div class="stat-sub">Closed losers</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Best Streak</div>
+            <div class="stat-val green" id="tl-bstreak">—</div>
+            <div class="stat-sub">Consecutive wins</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Worst Streak</div>
+            <div class="stat-val red" id="tl-wstreak">—</div>
+            <div class="stat-sub">Consecutive losses</div>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-header">
+            <div class="table-title">All Trades</div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <div class="table-filters">
+                <button class="filter-btn active" onclick="filterAll('All',this)">All</button>
+                <button class="filter-btn" onclick="filterAll('Open',this)">Open</button>
+                <button class="filter-btn" onclick="filterAll('Win',this)">Wins</button>
+                <button class="filter-btn" onclick="filterAll('Loss',this)">Losses</button>
+              </div>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th><th>Symbol</th><th>Type</th><th>Direction</th>
+                <th>Entry</th><th>Exit</th><th>P&L</th><th>RR</th><th>Status</th><th>Tags</th><th>Notes</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="all-trades-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ANALYTICS PAGE -->
+      <div class="page" id="page-analytics">
+        <div class="analytics-grid">
+          <div class="chart-card wide">
+            <div class="chart-header">
+              <div class="chart-title">Monthly P&L</div>
+              <div class="chart-meta">Bar = monthly net P&L</div>
+            </div>
+            <div class="chart-wrap" style="height:200px">
+              <canvas id="monthlyPnlChart"></canvas>
+            </div>
+          </div>
+          <div class="chart-card half">
+            <div class="chart-header">
+              <div class="chart-title">P&L by Asset Type</div>
+            </div>
+            <div class="chart-wrap" style="height:180px">
+              <canvas id="assetPnlChart"></canvas>
+            </div>
+          </div>
+          <div class="chart-card half">
+            <div class="chart-header">
+              <div class="chart-title">RR Distribution</div>
+            </div>
+            <div class="chart-wrap" style="height:180px">
+              <canvas id="rrDistChart"></canvas>
+            </div>
+          </div>
+          <div class="chart-card half">
+            <div class="chart-header">
+              <div class="chart-title">Win Rate by Asset</div>
+            </div>
+            <div class="chart-wrap" style="height:180px">
+              <canvas id="winRateAssetChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INVESTING PAGE -->
+      <div class="page" id="page-investing">
+        <div class="invest-stats">
+          <div class="stat-card">
+            <div class="stat-label">Total Return</div>
+            <div class="stat-val" id="inv-ret-pct">—</div>
+            <div class="stat-sub" id="inv-count">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Unrealized P&L</div>
+            <div class="stat-val" id="inv-pnl">—</div>
+            <div class="stat-sub" id="inv-pnl-pct">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Best Holding</div>
+            <div class="stat-val green" id="inv-best">—</div>
+            <div class="stat-sub" id="inv-best-sym">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Worst Holding</div>
+            <div class="stat-val red" id="inv-worst">—</div>
+            <div class="stat-sub" id="inv-worst-sym">—</div>
+          </div>
+        </div>
+
+        <!-- Cash / Realized row -->
+        <div class="stats-row" style="grid-template-columns:repeat(3,1fr)">
+          <div class="stat-card">
+            <div class="stat-label">Cash Balance (USD)</div>
+            <div class="stat-val green" id="inv-cash"><span class="balance-val">$0.00</span></div>
+            <div class="stat-sub">From closed positions</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Realized P&L</div>
+            <div class="stat-val" id="inv-realized">—</div>
+            <div class="stat-sub" id="inv-realized-sub">All time</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Equity</div>
+            <div class="stat-val" id="inv-total-equity">—</div>
+            <div class="stat-sub">Holdings + Cash</div>
+          </div>
+        </div>
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-header">
+              <div class="chart-title">Portfolio Allocation</div>
+            </div>
+            <div class="chart-wrap" style="height:200px">
+              <canvas id="allocChart"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <div class="chart-title">Return per Holding</div>
+            </div>
+            <div class="chart-wrap" style="height:200px">
+              <canvas id="holdingRetChart"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-header">
+            <div class="table-title">Holdings</div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span id="price-status" style="font-family:var(--mono);font-size:10px;color:var(--muted)">Prices loading…</span>
+              <button onclick="fetchLivePrices()" class="btn btn-ghost" style="font-size:10px;padding:4px 10px">⟳ Refresh</button>
+            </div>
+          </div>
+          <div id="holdings-list"></div>
+        </div>
+
+        <!-- Realized P&L History -->
+        <div class="table-card" id="realized-history-card" style="display:none">
+          <div class="table-header">
+            <div class="table-title">Realized P&L History</div>
+            <button onclick="clearRealizedHistory()" class="btn btn-ghost" style="font-size:10px;padding:4px 10px;color:var(--red)">Clear History</button>
+          </div>
+          <div style="max-height:300px;overflow-y:auto">
+            <table>
+              <thead style="position:sticky;top:0;background:var(--surface);z-index:1">
+                <tr>
+                  <th>Date</th><th>Symbol</th><th>Qty Sold</th><th>Avg Cost</th><th>Exit Price</th><th>Realized P&L</th><th>Proceeds</th>
+                </tr>
+              </thead>
+              <tbody id="realized-history-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- EQUITY CURVE PAGE -->
+      <div class="page" id="page-equity">
+        <div class="stats-row" style="grid-template-columns: repeat(4,1fr)">
+          <div class="stat-card">
+            <div class="stat-label">Overall Equity</div>
+            <div class="stat-val green" id="ov-equity">—</div>
+            <div class="stat-sub">Trading + Investing</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Overall Return</div>
+            <div class="stat-val" id="ov-return">—</div>
+            <div class="stat-sub" id="ov-return-sub">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Max Drawdown</div>
+            <div class="stat-val red" id="ov-dd">—</div>
+            <div class="stat-sub">Peak to trough</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Trades</div>
+            <div class="stat-val blue" id="ov-trades">—</div>
+            <div class="stat-sub">Closed</div>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">Overall Equity Curve — Trading</div>
+            <div class="chart-meta" id="ov-meta">—</div>
+          </div>
+          <div class="chart-wrap" style="height:260px">
+            <canvas id="overallEquityChart"></canvas>
+          </div>
+        </div>
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-header">
+              <div class="chart-title">Monthly P&L</div>
+            </div>
+            <div class="chart-wrap" style="height:180px">
+              <canvas id="yearlyChart"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <div class="chart-title">Cumulative P&L by Month</div>
+            </div>
+            <div class="chart-wrap" style="height:180px">
+              <canvas id="monthlyRetChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CALENDAR PAGE -->
+      <div class="page" id="page-calendar">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">P&L Calendar</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <button onclick="calPrevMonth()" class="btn btn-ghost" style="padding:4px 10px;font-size:12px">‹</button>
+              <span id="cal-month-label" style="font-family:var(--mono);font-size:12px;font-weight:600;min-width:120px;text-align:center"></span>
+              <button onclick="calNextMonth()" class="btn btn-ghost" style="padding:4px 10px;font-size:12px">›</button>
+            </div>
+          </div>
+          <div id="cal-stats-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px"></div>
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px">
+            <div style="text-align:center;font-size:9px;color:var(--muted);font-weight:600;padding:4px 0">Sun</div>
+            <div style="text-align:center;font-size:9px;color:var(--muted);font-weight:600;padding:4px 0">Mon</div>
+            <div style="text-align:center;font-size:9px;color:var(--muted);font-weight:600;padding:4px 0">Tue</div>
+            <div style="text-align:center;font-size:9px;color:var(--muted);font-weight:600;padding:4px 0">Wed</div>
+            <div style="text-align:center;font-size:9px;color:var(--muted);font-weight:600;padding:4px 0">Thu</div>
+            <div style="text-align:center;font-size:9px;color:var(--muted);font-weight:600;padding:4px 0">Fri</div>
+            <div style="text-align:center;font-size:9px;color:var(--muted);font-weight:600;padding:4px 0">Sat</div>
+          </div>
+          <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px"></div>
+        </div>
+
+        <!-- Daily P&L Log — shows aggregated end-of-day entries -->
+        <div class="table-card">
+          <div class="table-header">
+            <div class="chart-title">Daily P&L Log</div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--muted)">Each row = one trading day</div>
+          </div>
+          <div style="max-height:340px;overflow-y:auto">
+            <table>
+              <thead style="position:sticky;top:0;background:var(--surface);z-index:1">
+                <tr>
+                  <th>Date</th><th>Day</th><th>Trades</th><th>Wins</th><th>Losses</th><th>Daily P&L</th><th>Cumulative</th>
+                </tr>
+              </thead>
+              <tbody id="daily-pnl-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Clicked day detail -->
+        <div class="table-card" id="cal-day-trades" style="display:none">
+          <div class="table-header">
+            <div class="table-title" id="cal-day-title">Trades</div>
+          </div>
+          <table>
+            <thead><tr><th>Symbol</th><th>Direction</th><th>Entry</th><th>Exit</th><th>P&L</th><th>RR</th><th>Status</th></tr></thead>
+            <tbody id="cal-day-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- QUERY BUILDER PAGE -->
+      <div class="page" id="page-query">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">Quick Filters</div>
+            <div class="chart-meta">Click to load</div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px" id="presets-bar"></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">Build Your Query</div>
+            <div class="chart-meta" id="q-count"></div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px" id="conditions-wrap"></div>
+
+          <div style="display:flex;gap:8px;margin-top:14px;align-items:center">
+            <button class="btn btn-ghost" onclick="addCondition()" style="font-size:11px">+ Add Filter</button>
+            <div style="flex:1"></div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:11px;color:var(--muted)">Sort by</span>
+              <select class="form-select" id="q-sort-field" style="width:140px;padding:6px 10px;font-size:11px">
+                <option value="date">Date</option>
+                <option value="pnl">P&L</option>
+                <option value="rr">RR</option>
+                <option value="size">Size</option>
+              </select>
+              <select class="form-select" id="q-sort-dir" style="width:90px;padding:6px 10px;font-size:11px">
+                <option value="desc">DESC</option>
+                <option value="asc">ASC</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" onclick="runQuery()" style="font-size:11px">Run Query</button>
+          </div>
+        </div>
+
+        <div class="chart-card" id="sql-card" style="display:none">
+          <div class="chart-header">
+            <div class="chart-title">Generated SQL <span style="font-size:9px;color:var(--muted);font-weight:400;margin-left:8px">Supabase-ready</span></div>
+            <button class="btn btn-ghost" onclick="copySQL()" style="font-size:10px;padding:4px 10px">Copy</button>
+          </div>
+          <pre id="sql-output" style="font-family:var(--mono);font-size:11px;color:var(--green);background:var(--bg);padding:14px;border-radius:8px;overflow-x:auto;line-height:1.7;white-space:pre-wrap"></pre>
+        </div>
+
+        <div class="table-card" id="query-results" style="display:none">
+          <div class="table-header">
+            <div class="table-title">Results <span id="result-count" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-left:6px"></span></div>
+            <div style="display:flex;gap:16px">
+              <div style="font-family:var(--mono);font-size:11px">Total P&L: <span id="res-pnl" class="green"></span></div>
+              <div style="font-family:var(--mono);font-size:11px">Avg RR: <span id="res-rr" class="blue"></span></div>
+              <div style="font-family:var(--mono);font-size:11px">Win Rate: <span id="res-wr" class="green"></span></div>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th><th>Symbol</th><th>Type</th><th>Direction</th>
+                <th>Entry</th><th>Exit</th><th>P&L</th><th>RR</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="query-results-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SCHEMA PAGE -->
+      <div class="page" id="page-schema">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">Supabase Schema — Setup Guide</div>
+            <button class="btn btn-ghost" onclick="copySchema()" style="font-size:10px;padding:4px 10px">Copy SQL</button>
+          </div>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6">Run this in your Supabase SQL Editor to set up TradeLog. Creates all tables, indexes for fast querying, and row-level security so only you can see your data.</p>
+          <pre id="schema-sql" style="font-family:var(--mono);font-size:11px;color:var(--text);background:var(--bg);padding:16px;border-radius:8px;overflow-x:auto;line-height:1.8;white-space:pre-wrap"></pre>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-header"><div class="chart-title">Table: trades</div></div>
+            <div id="schema-trades-cols"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header"><div class="chart-title">Table: investments</div></div>
+            <div id="schema-invest-cols"></div>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header"><div class="chart-title">Example Queries</div></div>
+          <div style="display:flex;flex-direction:column;gap:12px" id="example-queries"></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- TRADE MODAL -->
+<div class="modal-overlay" id="trade-modal">
+  <div class="modal">
+    <div class="modal-title" id="trade-modal-title">Log New Trade</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Symbol</label>
+        <input class="form-input" placeholder="BTC/USDT, EUR/USD, AAPL…" id="t-symbol">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Asset Type</label>
+        <select class="form-select" id="t-type">
+          <option>Crypto</option><option>Forex</option><option>Stocks</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Direction</label>
+        <select class="form-select" id="t-dir">
+          <option>Long</option><option>Short</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input class="form-input" type="date" id="t-date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Entry Price</label>
+        <input class="form-input" type="number" placeholder="0.00" id="t-entry">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Exit Price</label>
+        <input class="form-input" type="number" placeholder="Leave blank if open" id="t-exit">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Position Size ($)</label>
+        <input class="form-input" type="number" placeholder="0.00" id="t-size">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Stop Loss</label>
+        <input class="form-input" type="number" placeholder="0.00" id="t-sl">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Take Profit</label>
+        <input class="form-input" type="number" placeholder="0.00" id="t-tp">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Setup / Strategy</label>
+        <input class="form-input" placeholder="Breakout, EMA cross…" id="t-setup">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Tags <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(comma separated)</span></label>
+        <input class="form-input" placeholder="scalp, swing, breakout, revenge…" id="t-tags">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Notes</label>
+        <textarea class="form-textarea" id="t-notes" placeholder="What was your reasoning? What happened?"></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('trade-modal')">Cancel</button>
+      <button class="btn btn-primary" id="log-trade-btn" onclick="saveTrade()">Log Trade</button>
+    </div>
+    <input type="hidden" id="t-edit-id">
+  </div>
+</div>
+
+<!-- CLOSE TRADE MODAL -->
+<div class="modal-overlay" id="close-trade-modal">
+  <div class="modal" style="width:360px">
+    <div class="modal-title">Close Trade</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px" id="close-trade-info"></div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Exit Price</label>
+      <input class="form-input" type="number" placeholder="0.00" id="ct-exit" style="width:100%">
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Exit Date</label>
+      <input class="form-input" type="date" id="ct-date" style="width:100%">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('close-trade-modal')">Cancel</button>
+      <button class="btn btn-primary" id="close-trade-btn" onclick="closeTradeSubmit()">Close Trade</button>
+    </div>
+    <input type="hidden" id="ct-trade-id">
+  </div>
+</div>
+
+<!-- INVEST MODAL -->
+<div class="modal-overlay" id="invest-modal">
+  <div class="modal">
+    <div class="modal-title" id="invest-modal-title">Add Investment</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Asset</label>
+        <input class="form-input" placeholder="BTC, AAPL, GOLD…" id="i-symbol">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Type</label>
+        <select class="form-select" id="i-type">
+          <option>Crypto</option><option>Stocks</option><option>ETF</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Buy Date</label>
+        <input class="form-input" type="date" id="i-date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Qty / Units</label>
+        <input class="form-input" type="number" placeholder="0.00" id="i-qty">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Avg Buy Price ($)</label>
+        <input class="form-input" type="number" placeholder="0.00" id="i-price">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Current Price ($)</label>
+        <input class="form-input" type="number" placeholder="0.00" id="i-cur">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Notes</label>
+        <textarea class="form-textarea" id="i-notes" placeholder="Investment thesis…"></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('invest-modal')">Cancel</button>
+      <button class="btn btn-primary" id="add-invest-btn" onclick="saveInvestment()">Add Holding</button>
+    </div>
+    <input type="hidden" id="i-edit-id">
+  </div>
+</div>
+
+<!-- PROFILE MODAL -->
+<div class="modal-overlay" id="profile-modal">
+  <div class="modal" style="width:400px">
+    <div class="modal-title">Profile</div>
+
+    <!-- Avatar preview + upload -->
+    <div style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:24px">
+      <div id="profile-avatar-preview" style="width:80px;height:80px;border-radius:50%;background:var(--green-dim);border:2px solid var(--green);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:28px;font-weight:700;color:var(--green);overflow:hidden;cursor:pointer;position:relative" onclick="document.getElementById('profile-photo-input').click()">
+        <span id="profile-avatar-initials">?</span>
+        <img id="profile-avatar-img" style="display:none;width:100%;height:100%;object-fit:cover;position:absolute;inset:0">
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.15s;border-radius:50%" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0">
+          <span style="font-size:18px">📷</span>
+        </div>
+      </div>
+      <input type="file" id="profile-photo-input" accept="image/*" style="display:none" onchange="handleProfilePhoto(this)">
+      <div style="font-size:10px;color:var(--muted)">Click avatar to upload photo</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="form-group">
+        <label class="form-label">Display Name</label>
+        <input class="form-input" id="profile-name-input" placeholder="Your name" style="width:100%">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <div id="profile-email-display" style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:7px">—</div>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('profile-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLOSE POSITION MODAL -->
+<div class="modal-overlay" id="close-position-modal">
+  <div class="modal" style="width:420px">
+    <div class="modal-title">Close Position</div>
+    <div id="close-pos-info" style="background:var(--bg);border-radius:8px;padding:12px 14px;margin-bottom:18px;font-size:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Exit Price ($)</label>
+        <input class="form-input" type="number" placeholder="0.00" id="cp-exit-price" oninput="updateClosePnl()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Qty to Sell</label>
+        <input class="form-input" type="number" placeholder="0.00" id="cp-qty" oninput="updateClosePnl()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Close Date</label>
+        <input class="form-input" type="date" id="cp-date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Close Type</label>
+        <select class="form-select" id="cp-type" onchange="onCloseTypeChange()">
+          <option value="full">Full Close</option>
+          <option value="partial">Partial Close</option>
+        </select>
+      </div>
+    </div>
+    <div id="cp-pnl-preview" style="margin-top:16px;background:var(--bg);border-radius:8px;padding:12px 14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-family:var(--mono);font-size:11px">
+      <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Realized P&L</div><div id="cp-pnl-val" style="font-weight:700;font-size:14px">—</div></div>
+      <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Proceeds (USD)</div><div id="cp-proceeds-val" style="font-weight:700;font-size:14px">—</div></div>
+      <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Return %</div><div id="cp-ret-val" style="font-weight:700;font-size:14px">—</div></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('close-position-modal')">Cancel</button>
+      <button class="btn btn-primary" id="cp-submit-btn" onclick="submitClosePosition()">Close Position</button>
+    </div>
+    <input type="hidden" id="cp-holding-id">
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
