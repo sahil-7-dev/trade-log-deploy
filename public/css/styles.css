@@ -310,3 +310,33 @@
   0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
 }
+
+/* CSP-SAFE HOVER STATES (replaces inline onmouseenter/onmouseleave) */
+#hide-balance-btn { color: var(--muted); }
+#hide-balance-btn:hover { color: var(--text); }
+
+.btn-open-profile { color: var(--muted); }
+.btn-open-profile:hover { color: var(--text); }
+
+.btn-signout { color: var(--muted); transition: color 0.15s; }
+.btn-signout:hover { color: var(--red); }
+
+.icon-btn-edit { color: var(--muted); transition: color 0.15s; }
+.icon-btn-edit:hover { color: var(--blue); }
+
+.icon-btn-delete { color: var(--muted); transition: color 0.15s; }
+.icon-btn-delete:hover { color: var(--red); }
+
+.btn-close-mini {
+  background: var(--green-dim); color: var(--green);
+}
+
+.btn-close-position {
+  background: var(--green-dim); color: var(--green);
+  transition: background 0.15s, color 0.15s;
+}
+.btn-close-position:hover { background: var(--green); color: #000; }
+
+.avatar-photo-overlay { opacity: 0; transition: opacity 0.15s; }
+#profile-avatar-preview:hover .avatar-photo-overlay { opacity: 1; }
+

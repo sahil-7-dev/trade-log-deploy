@@ -49,6 +49,25 @@ create table investments (
   notes       text
 );
 
+-- One row per user: public-ish display name (checked for uniqueness at signup/edit).
+-- Case-insensitive uniqueness so "TraderDotETH" and "traderdoteth" can't both exist.
+create table profiles (
+  user_id       uuid primary key references auth.users(id) on delete cascade,
+  display_name  text not null,
+  updated_at    timestamptz default now()
+);
+
+create unique index idx_profiles_display_name_lower on profiles (lower(display_name));
+
+-- One row per user: cash balance + realized (closed-position) P&L history.
+-- Upserted via PostgREST on_conflict=user_id, so no separate insert/update path needed.
+create table user_settings (
+  user_id           uuid primary key references auth.users(id) on delete cascade,
+  cash_balance      numeric(18,2) not null default 0,
+  realized_history  jsonb not null default '[]'::jsonb,
+  updated_at        timestamptz default now()
+);
+
 create index idx_trades_user   on trades(user_id);
 create index idx_trades_date   on trades(date desc);
 create index idx_trades_type   on trades(type);
@@ -57,11 +76,38 @@ create index idx_trades_rr     on trades(rr);
 create index idx_trades_pnl    on trades(pnl);
 create index idx_invest_user   on investments(user_id);
 
-alter table trades      enable row level security;
-alter table investments enable row level security;
+alter table trades        enable row level security;
+alter table investments   enable row level security;
+alter table profiles      enable row level security;
+alter table user_settings enable row level security;
 
 create policy "Users see own trades"
   on trades for all using (auth.uid() = user_id);
 
 create policy "Users see own investments"
   on investments for all using (auth.uid() = user_id);
+
+create policy "Users manage own profile"
+  on profiles for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "Users manage own settings"
+  on user_settings for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Narrow, safe availability check: returns only true/false, never leaks any
+-- other user's row data. Runs as SECURITY DEFINER so it can see across all
+-- profiles despite the RLS policy above restricting normal reads to one's own row.
+create or replace function is_display_name_available(check_name text)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select not exists (
+    select 1 from profiles
+    where lower(display_name) = lower(check_name)
+      and user_id <> auth.uid()
+  );
+$$;
+
+revoke all on function is_display_name_available(text) from public;
+grant execute on function is_display_name_available(text) to authenticated;

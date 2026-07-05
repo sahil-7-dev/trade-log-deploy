@@ -247,8 +247,8 @@ async function forceRefreshToken() {
 }
 
 // ─── SUPABASE CRUD ────────────────────────────────────────────────────────────
-async function sbRequest(method, path, body = null, isRetry = false) {
-  const headers = { ...authHeaders(), "Prefer": "return=representation" };
+async function sbRequest(method, path, body = null, isRetry = false, preferHeader = "return=representation") {
+  const headers = { ...authHeaders(), "Prefer": preferHeader };
   const opts = { method, headers };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, opts);
@@ -258,7 +258,7 @@ async function sbRequest(method, path, body = null, isRetry = false) {
     const refreshed = await forceRefreshToken();
     if (refreshed) {
       log.info('[sbRequest] Refresh succeeded, retrying request...');
-      return sbRequest(method, path, body, true);
+      return sbRequest(method, path, body, true, preferHeader);
     }
     log.error('[sbRequest] Refresh failed — session truly expired');
     throw new Error('SESSION_EXPIRED');
@@ -293,13 +293,70 @@ async function sbUpdate(table, id, body) {
   return res.json();
 }
 
+// user_settings is a single row per user (cash balance + realized history).
+// POST with on_conflict + merge-duplicates does an atomic upsert in one call.
+async function sbGetSettings() {
+  const res = await sbRequest("GET", `user_settings?user_id=eq.${currentUser.id}&select=cash_balance,realized_history`);
+  if (!res.ok) throw new Error(`Settings load failed: ${res.status}`);
+  return res.json();
+}
+
+async function sbUpsertSettings() {
+  const res = await sbRequest(
+    "POST",
+    "user_settings?on_conflict=user_id",
+    { user_id: currentUser.id, cash_balance: cashBalance, realized_history: realizedHistory },
+    false,
+    "resolution=merge-duplicates,return=minimal"
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Settings save failed: ${res.status}`);
+  }
+}
+
+// profiles — display name, checked for global uniqueness via a security-definer
+// RPC so the client never needs read access to other users' rows.
+async function sbGetProfile() {
+  const res = await sbRequest("GET", `profiles?user_id=eq.${currentUser.id}&select=display_name`);
+  if (!res.ok) throw new Error(`Profile load failed: ${res.status}`);
+  return res.json();
+}
+
+async function sbCheckNameAvailable(name) {
+  const res = await sbRequest("POST", "rpc/is_display_name_available", { check_name: name });
+  if (!res.ok) throw new Error(`Availability check failed: ${res.status}`);
+  return res.json(); // true | false
+}
+
+async function sbUpsertProfile(name) {
+  const res = await sbRequest(
+    "POST",
+    "profiles?on_conflict=user_id",
+    { user_id: currentUser.id, display_name: name },
+    false,
+    "resolution=merge-duplicates,return=minimal"
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    // Postgres unique_violation — the case-insensitive index rejected it.
+    // (Belt-and-braces: the live availability check already tries to prevent
+    // this, but a race between two people saving the same name at once is
+    // only actually stopped here, at the database constraint.)
+    if (err.code === '23505') throw new Error('TAKEN');
+    throw new Error(err.message || `Profile save failed: ${res.status}`);
+  }
+}
+
 // ─── LOAD DATA ────────────────────────────────────────────────────────────────
 async function loadAllData() {
   showLoading(true);
   try {
-    const [trades, investments] = await Promise.all([
+    const [trades, investments, settings, profile] = await Promise.all([
       sbSelect('trades', 'select=*'),
-      sbSelect('investments', 'select=*')
+      sbSelect('investments', 'select=*'),
+      sbGetSettings().catch(e => { log.warn('[loadAllData] Settings fetch failed:', e.message); return null; }),
+      sbGetProfile().catch(e => { log.warn('[loadAllData] Profile fetch failed:', e.message); return null; })
     ]);
     TRADES = Array.isArray(trades) ? trades.map(normalizeTrade) : [];
     HOLDINGS = Array.isArray(investments) ? investments.map(h => ({
@@ -310,6 +367,35 @@ async function loadAllData() {
       color: assetColor(h.symbol),
       livePrice: false
     })) : [];
+
+    if (Array.isArray(settings) && settings.length > 0) {
+      // Row exists on the server — it's the source of truth across devices
+      cashBalance = parseFloat(settings[0].cash_balance) || 0;
+      realizedHistory = Array.isArray(settings[0].realized_history) ? settings[0].realized_history : [];
+      safeLocalSet('cash_balance', cashBalance.toString());
+      safeLocalSet('realized_history', JSON.stringify(realizedHistory));
+    } else if (settings !== null) {
+      // No row yet — first login since this feature shipped. Push whatever's
+      // in the local cache (cashBalance/realizedHistory already loaded from
+      // localStorage at startup) up to Supabase so it isn't lost.
+      sbUpsertSettings().catch(e => log.warn('[loadAllData] Initial settings migration failed:', e.message));
+    }
+    // If settings === null (fetch failed, e.g. offline), keep using the
+    // localStorage-derived values already in memory rather than resetting them.
+
+    if (Array.isArray(profile) && profile.length > 0) {
+      // Server has a claimed display name — it's the source of truth
+      profileName = profile[0].display_name || '';
+      safeLocalSet('profile_name', profileName);
+      loadProfile();
+    } else if (profile !== null && profileName) {
+      // No server row yet, but a local name exists from before this feature —
+      // try to claim it server-side. If someone else already has it, leave it
+      // local-only; the profile modal will prompt for a different name next
+      // time it's opened, same as any other "taken" case.
+      sbUpsertProfile(profileName).catch(e => log.warn('[loadAllData] Initial profile migration failed:', e.message));
+    }
+
     log.info('[loadAllData] Success — trades:', TRADES.length, 'holdings:', HOLDINGS.length);
     renderAll();
     startPriceRefresh();
@@ -874,7 +960,7 @@ function renderDailyPnlLog() {
     const dayName = DAYS[new Date(d + 'T00:00:00').getDay()];
     const isToday = d === today;
 
-    return `<tr style="${isToday ? 'background:var(--surface2)' : ''}" onclick="calGotoDay('${d}')" style="cursor:pointer">
+    return `<tr style="${isToday ? 'background:var(--surface2);' : ''}cursor:pointer" data-action="cal-goto-day" data-date="${d}">
       <td class="mono" style="color:var(--muted)">${d}${isToday ? ' <span style="color:var(--amber);font-size:9px">TODAY</span>' : ''}</td>
       <td style="color:var(--muted);font-size:11px">${dayName}</td>
       <td class="mono">${trades.length}</td>
@@ -967,7 +1053,7 @@ function renderCalendarGrid() {
 
     cells += `<div class="cal-cell ${isSelected ? 'active-day' : ''}"
       style="background:${bg};border:1px solid ${border};opacity:${isFuture ? '0.3' : '1'}"
-      onclick="calSelectDay(${d})">
+      data-action="cal-select-day" data-day="${d}">
       <div class="cal-cell-date" style="color:${isToday ? 'var(--amber)' : 'var(--muted)'};font-weight:${isToday ? '700' : '400'}">${d}</div>
       ${pnlStr}
     </div>`;
@@ -1103,10 +1189,13 @@ async function saveInvestment() {
 
   try {
     if (editId) {
-      // EDIT MODE
+      // EDIT MODE — adjust cash by the delta between old and new cost basis
+      const idx = HOLDINGS.findIndex(h => h.id === editId);
+      const oldCost = idx !== -1 ? HOLDINGS[idx].qty * HOLDINGS[idx].buyPrice : 0;
+      const newCost = qty * buy_price;
+
       const result = await sbUpdate('investments', editId, payload);
       const updated = result && result[0] ? result[0] : { ...payload, id: editId };
-      const idx = HOLDINGS.findIndex(h => h.id === editId);
       if (idx !== -1) {
         HOLDINGS[idx] = {
           ...HOLDINGS[idx],
@@ -1117,9 +1206,12 @@ async function saveInvestment() {
           color: assetColor(symbol),
         };
       }
+
+      cashBalance = parseFloat((cashBalance + oldCost - newCost).toFixed(2));
+      await saveRealizedData();
       toast('Investment updated ✓');
     } else {
-      // ADD MODE
+      // ADD MODE — buying with cash, so deduct the cost from cash balance
       const fullPayload = { ...payload, user_id: currentUser.id };
       const result = await sbInsert('investments', fullPayload);
       if (result && result[0]) {
@@ -1131,7 +1223,12 @@ async function saveInvestment() {
           color: assetColor(symbol),
           livePrice: false,
         });
-        toast('Investment added ✓');
+
+        const cost = parseFloat((qty * buy_price).toFixed(2));
+        cashBalance = parseFloat((cashBalance - cost).toFixed(2));
+        await saveRealizedData();
+
+        toast(`Investment added ✓  $${cost.toFixed(2)} deducted from cash`);
       }
     }
 
@@ -1164,10 +1261,18 @@ async function deleteTrade(id) {
 
 // ─── DELETE HOLDING ───────────────────────────────────────────────────────────
 async function deleteHolding(id) {
-  if (!confirm('Remove this holding?')) return;
+  if (!confirm('Remove this holding? Its cost basis will be refunded to your cash balance.')) return;
   try {
+    const h = HOLDINGS.find(h => h.id === id);
     await sbDelete('investments', id);
     HOLDINGS = HOLDINGS.filter(h => h.id !== id);
+
+    if (h) {
+      const refund = parseFloat((h.qty * h.buyPrice).toFixed(2));
+      cashBalance = parseFloat((cashBalance + refund).toFixed(2));
+      await saveRealizedData();
+    }
+
     renderAll();
     toast('Holding removed');
   } catch (e) {
@@ -1220,9 +1325,9 @@ function tradeRow(t, showNotes = false, showActions = false) {
     ${showNotes ? `<td style="max-width:120px">${tagsHtml}</td>` : ''}
     ${showNotes ? `<td style="color:var(--muted);font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis">${safeNotes}</td>` : ''}
     ${showActions ? `<td style="white-space:nowrap">
-      ${safeStatus === 'Open' ? `<button onclick="openCloseTrade('${safeId}')" style="background:var(--green-dim);border:none;color:var(--green);cursor:pointer;font-size:10px;padding:3px 8px;border-radius:4px;font-family:var(--mono);font-weight:600">Close</button>` : ''}
-      <button onclick="openEditTrade('${safeId}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px" onmouseenter="this.style.color='var(--blue)'" onmouseleave="this.style.color='var(--muted)'">✎</button>
-      <button onclick="deleteTrade('${safeId}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px" onmouseenter="this.style.color='var(--red)'" onmouseleave="this.style.color='var(--muted)'">✕</button>
+      ${safeStatus === 'Open' ? `<button class="btn-close-mini" data-action="open-close-trade" data-id="${safeId}">Close</button>` : ''}
+      <button class="icon-btn-edit" data-action="open-edit-trade" data-id="${safeId}" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">✎</button>
+      <button class="icon-btn-delete" data-action="delete-trade" data-id="${safeId}" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">✕</button>
     </td>` : ''}
   </tr>`;
 }
@@ -1243,16 +1348,22 @@ function safeLocalSet(key, value) {
   }
 }
 
-function saveRealizedData() {
+async function saveRealizedData() {
   safeLocalSet('realized_history', JSON.stringify(realizedHistory));
   safeLocalSet('cash_balance', cashBalance.toString());
+  try {
+    await sbUpsertSettings();
+  } catch (e) {
+    log.warn('[saveRealizedData] Supabase sync failed, kept locally:', e.message);
+    toast('Cash balance saved locally — sync to server failed', 'err');
+  }
 }
 
-function clearRealizedHistory() {
+async function clearRealizedHistory() {
   if (!confirm('Clear all realized P&L history and reset cash balance to $0?')) return;
   realizedHistory = [];
   cashBalance = 0;
-  saveRealizedData();
+  await saveRealizedData();
   renderRealizedHistory();
   renderInvestingStats();
   toast('Realized history cleared');
@@ -1368,7 +1479,7 @@ async function submitClosePosition() {
     realizedHistory.unshift(record);
 
     cashBalance = parseFloat((cashBalance + proceeds).toFixed(2));
-    saveRealizedData();
+    await saveRealizedData();
 
     closeModal('close-position-modal');
     renderAll();
@@ -1510,9 +1621,9 @@ function renderHoldings() {
         <div class="holding-val"><span class="balance-val">${fmtVal(val)}</span></div>
         <div class="holding-ret ${pnl >= 0 ? 'green' : 'red'}"><span class="balance-val">${fmt(pnl)}</span> (${pnl >= 0 ? '+' : ''}${pct}%)</div>
       </div>
-      <button onclick="openClosePosition('${safeId}')" style="background:var(--green-dim);border:1px solid var(--green);color:var(--green);cursor:pointer;font-size:10px;padding:3px 8px;border-radius:4px;font-family:var(--mono);font-weight:600;margin-left:4px" onmouseenter="this.style.background='var(--green)';this.style.color='#000'" onmouseleave="this.style.background='var(--green-dim)';this.style.color='var(--green)'">Close</button>
-      <button onclick="openEditInvestment('${safeId}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 8px;border-radius:4px" onmouseenter="this.style.color='var(--blue)'" onmouseleave="this.style.color='var(--muted)'">✎</button>
-      <button onclick="deleteHolding('${safeId}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 8px;margin-left:2px;border-radius:4px" onmouseenter="this.style.color='var(--red)'" onmouseleave="this.style.color='var(--muted)'">✕</button>
+      <button class="btn-close-position" data-action="open-close-position" data-id="${safeId}" style="border:1px solid var(--green);cursor:pointer;font-size:10px;padding:3px 8px;border-radius:4px;font-family:var(--mono);font-weight:600;margin-left:4px">Close</button>
+      <button class="icon-btn-edit" data-action="open-edit-investment" data-id="${safeId}" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px 8px;border-radius:4px">✎</button>
+      <button class="icon-btn-delete" data-action="delete-holding" data-id="${safeId}" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px 8px;margin-left:2px;border-radius:4px">✕</button>
     </div>`;
   }).join('');
 }
@@ -1754,18 +1865,18 @@ function renderConditions() {
     const fieldHtml = FIELDS.map(f => `<option value="${f.key}" ${c.field === f.key ? 'selected' : ''}>${f.label}</option>`).join('');
     let valHtml;
     if (field.type === 'select') {
-      valHtml = `<select onchange="updateCond(${c.id},'val',this.value)">${field.opts.map(o => `<option value="${o}" ${c.val === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
+      valHtml = `<select data-action="update-cond" data-cond-id="${c.id}" data-cond-field="val">${field.opts.map(o => `<option value="${o}" ${c.val === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
     } else if (field.type === 'date') {
-      valHtml = `<input type="date" value="${c.val}" onchange="updateCond(${c.id},'val',this.value)" style="width:140px">`;
+      valHtml = `<input type="date" value="${c.val}" data-action="update-cond" data-cond-id="${c.id}" data-cond-field="val" style="width:140px">`;
     } else {
-      valHtml = `<input type="${field.type === 'number' ? 'number' : 'text'}" value="${c.val}" placeholder="value" onchange="updateCond(${c.id},'val',this.value)" style="width:100px">`;
+      valHtml = `<input type="${field.type === 'number' ? 'number' : 'text'}" value="${c.val}" placeholder="value" data-action="update-cond" data-cond-id="${c.id}" data-cond-field="val" style="width:100px">`;
     }
     return `<div class="condition-row">
       ${idx > 0 ? `<span class="logic-badge">AND</span>` : '<span style="font-family:var(--mono);font-size:9px;color:var(--muted);min-width:32px">WHERE</span>'}
-      <select onchange="updateCond(${c.id},'field',this.value)">${fieldHtml}</select>
-      <select onchange="updateCond(${c.id},'op',this.value)">${opsHtml}</select>
+      <select data-action="update-cond" data-cond-id="${c.id}" data-cond-field="field">${fieldHtml}</select>
+      <select data-action="update-cond" data-cond-id="${c.id}" data-cond-field="op">${opsHtml}</select>
       ${valHtml}
-      <button class="remove-cond" onclick="removeCondition(${c.id})">✕</button>
+      <button class="remove-cond" data-action="remove-condition" data-cond-id="${c.id}">✕</button>
     </div>`;
   }).join('');
 }
@@ -1865,7 +1976,7 @@ function copySQL() {
 function renderPresets() {
   const bar = document.getElementById('presets-bar');
   if (!bar) return;
-  bar.innerHTML = PRESETS.map((p, i) => `<button class="preset-chip" onclick="loadPreset(PRESETS[${i}])">${p.label}</button>`).join('');
+  bar.innerHTML = PRESETS.map((p, i) => `<button class="preset-chip" data-action="load-preset" data-preset-index="${i}">${p.label}</button>`).join('');
 }
 
 // ─── SCHEMA ───────────────────────────────────────────────────────────────────
@@ -2022,6 +2133,7 @@ function loadProfile() {
 
 function openProfileModal_internal() {
   document.getElementById('profile-name-input').value = profileName || '';
+  setNameStatus('');
   const emailEl = document.getElementById('profile-email-display');
   if (emailEl && currentUser) emailEl.textContent = currentUser.email || '—';
   const imgEl  = document.getElementById('profile-avatar-img');
@@ -2065,16 +2177,142 @@ function handleProfilePhoto(input) {
   reader.readAsDataURL(file);
 }
 
-function saveProfile() {
+async function saveProfile() {
   const name = document.getElementById('profile-name-input').value.trim();
   if (!name) return toast('Enter a display name', 'err');
-  profileName = name;
-  safeLocalSet('profile_name', profileName);
-  if (profilePhoto) safeLocalSet('profile_photo', profilePhoto);
-  loadProfile();
-  closeModal('profile-modal');
-  toast('Profile saved ✓');
+
+  const btn = document.querySelector('#profile-modal [data-action="save-profile"]');
+  const prevText = btn ? btn.textContent : '';
+  if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
+
+  try {
+    // Skip the round-trip only if the name is byte-identical to what's already
+    // saved (e.g. they just changed the photo). Any actual change — including
+    // a case-only re-cast — goes through the upsert so casing stays correct
+    // in Supabase too.
+    if (name !== profileName) {
+      await sbUpsertProfile(name);
+    }
+    profileName = name;
+    safeLocalSet('profile_name', profileName);
+    if (profilePhoto) safeLocalSet('profile_photo', profilePhoto);
+    loadProfile();
+    closeModal('profile-modal');
+    setNameStatus('');
+    toast('Profile saved ✓');
+  } catch (e) {
+    if (e.message === 'TAKEN') {
+      setNameStatus('✗ Already taken — try a different display name', 'red');
+    } else {
+      toast(e.message || 'Failed to save profile', 'err');
+    }
+  }
+
+  if (btn) { btn.textContent = prevText; btn.disabled = false; }
 }
+
+// ─── DISPLAY NAME AVAILABILITY (live check as the user types) ────────────────
+function setNameStatus(msg, color) {
+  const el = document.getElementById('profile-name-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = color === 'red' ? 'var(--red)' : color === 'green' ? 'var(--green)' : 'var(--muted)';
+}
+
+let nameCheckTimer = null;
+let nameCheckToken = 0;
+function onProfileNameInput(value) {
+  const name = value.trim();
+  clearTimeout(nameCheckTimer);
+
+  if (!name) { setNameStatus(''); return; }
+  if (name.toLowerCase() === (profileName || '').toLowerCase()) { setNameStatus(''); return; }
+  if (name.length < 3) { setNameStatus('Minimum 3 characters', 'red'); return; }
+
+  setNameStatus('Checking…');
+  const myToken = ++nameCheckToken;
+
+  nameCheckTimer = setTimeout(async () => {
+    try {
+      const available = await sbCheckNameAvailable(name);
+      if (myToken !== nameCheckToken) return; // a newer keystroke superseded this check
+      setNameStatus(available ? '✓ Available' : '✗ Already taken — try a different display name', available ? 'green' : 'red');
+    } catch (e) {
+      if (myToken !== nameCheckToken) return;
+      setNameStatus('');
+      log.warn('[onProfileNameInput] Availability check failed:', e.message);
+    }
+  }, 450);
+}
+
+// ─── EVENT DELEGATION (CSP-safe replacement for inline on* handlers) ─────────
+// Strict CSP (script-src 'self') blocks inline onclick/onchange/etc attributes.
+// Every interactive element in the HTML/templates instead carries a
+// data-action attribute; these three listeners route all UI events centrally.
+
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-action]');
+  if (!t) return;
+  const a = t.dataset.action;
+  switch (a) {
+    case 'sign-in': sbSignIn(); break;
+    case 'sign-up': sbSignUp(); break;
+    case 'sign-out': sbSignOut(); break;
+    case 'set-currency': setCurrency(t.dataset.currency, t); break;
+    case 'show-page': showPage(t.dataset.page, t); break;
+    case 'toggle-balance': toggleBalanceVisibility(); break;
+    case 'open-profile-modal': openProfileModal_internal(); break;
+    case 'export-csv': exportCSV(); break;
+    case 'open-add-investment': openAddInvestment(); break;
+    case 'open-add-trade': openAddTrade(); break;
+    case 'filter-recent': filterRecent(t.dataset.filter, t); break;
+    case 'filter-all': filterAll(t.dataset.filter, t); break;
+    case 'fetch-live-prices': fetchLivePrices(); break;
+    case 'clear-realized-history': clearRealizedHistory(); break;
+    case 'cal-prev-month': calPrevMonth(); break;
+    case 'cal-next-month': calNextMonth(); break;
+    case 'cal-goto-day': calGotoDay(t.dataset.date); break;
+    case 'cal-select-day': calSelectDay(parseInt(t.dataset.day, 10)); break;
+    case 'add-condition': addCondition(); break;
+    case 'remove-condition': removeCondition(parseInt(t.dataset.condId, 10)); break;
+    case 'load-preset': loadPreset(PRESETS[parseInt(t.dataset.presetIndex, 10)]); break;
+    case 'run-query': runQuery(); break;
+    case 'copy-sql': copySQL(); break;
+    case 'copy-schema': copySchema(); break;
+    case 'close-modal': closeModal(t.dataset.modal); break;
+    case 'save-trade': saveTrade(); break;
+    case 'close-trade-submit': closeTradeSubmit(); break;
+    case 'save-investment': saveInvestment(); break;
+    case 'save-profile': saveProfile(); break;
+    case 'submit-close-position': submitClosePosition(); break;
+    case 'trigger-photo-upload': document.getElementById('profile-photo-input').click(); break;
+    case 'open-close-trade': openCloseTrade(t.dataset.id); break;
+    case 'open-edit-trade': openEditTrade(t.dataset.id); break;
+    case 'delete-trade': deleteTrade(t.dataset.id); break;
+    case 'open-close-position': openClosePosition(t.dataset.id); break;
+    case 'open-edit-investment': openEditInvestment(t.dataset.id); break;
+    case 'delete-holding': deleteHolding(t.dataset.id); break;
+  }
+});
+
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.id === 'profile-photo-input') return handleProfilePhoto(t);
+  if (t.id === 'cp-type') return onCloseTypeChange();
+  if (t.dataset && t.dataset.action === 'update-cond') {
+    return updateCond(parseInt(t.dataset.condId, 10), t.dataset.condField, t.value);
+  }
+});
+
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  if (t.id === 'cp-exit-price' || t.id === 'cp-qty') updateClosePnl();
+  if (t.id === 'profile-name-input') onProfileNameInput(t.value);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.target.id === 'auth-pass' && e.key === 'Enter') sbSignIn();
+});
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 renderPresets();

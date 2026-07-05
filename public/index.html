@@ -25,11 +25,11 @@
       </div>
       <div>
         <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Password</div>
-        <input id="auth-pass" type="password" placeholder="••••••••" class="form-input" style="width:100%" onkeydown="if(event.key==='Enter')sbSignIn()">
+        <input id="auth-pass" type="password" placeholder="••••••••" class="form-input" style="width:100%">
       </div>
       <div id="auth-msg" style="font-size:11px;min-height:16px"></div>
-      <button class="btn btn-primary" onclick="sbSignIn()" style="width:100%;padding:10px">Sign In</button>
-      <button class="btn btn-ghost" onclick="sbSignUp()" style="width:100%;padding:10px">Create Account</button>
+      <button class="btn btn-primary" data-action="sign-in" style="width:100%;padding:10px">Sign In</button>
+      <button class="btn btn-ghost" data-action="sign-up" style="width:100%;padding:10px">Create Account</button>
     </div>
   </div>
 </div>
@@ -46,33 +46,33 @@
     </div>
 
     <div class="currency-toggle">
-      <button class="active" onclick="setCurrency('USD',this)">$ USD</button>
-      <button onclick="setCurrency('INR',this)">₹ INR</button>
+      <button class="active" data-action="set-currency" data-currency="USD">$ USD</button>
+      <button data-action="set-currency" data-currency="INR">₹ INR</button>
     </div>
 
     <nav class="nav">
       <div class="nav-section">Trading</div>
-      <div class="nav-item active" onclick="showPage('dashboard',this)">
+      <div class="nav-item active" data-action="show-page" data-page="dashboard">
         <span class="icon">◉</span> Dashboard
       </div>
-      <div class="nav-item" onclick="showPage('trades',this)">
+      <div class="nav-item" data-action="show-page" data-page="trades">
         <span class="icon">⇄</span> Trade Log
       </div>
-      <div class="nav-item" onclick="showPage('analytics',this)">
+      <div class="nav-item" data-action="show-page" data-page="analytics">
         <span class="icon">◈</span> Analytics
       </div>
       <div class="nav-section" style="margin-top:8px">Investing</div>
-      <div class="nav-item" onclick="showPage('investing',this)">
+      <div class="nav-item" data-action="show-page" data-page="investing">
         <span class="icon">◆</span> Portfolio
       </div>
-      <div class="nav-item" onclick="showPage('equity',this)">
+      <div class="nav-item" data-action="show-page" data-page="equity">
         <span class="icon">↗</span> Equity Curve
       </div>
       <div class="nav-section" style="margin-top:8px">Tools</div>
-      <div class="nav-item" onclick="showPage('calendar',this)">
+      <div class="nav-item" data-action="show-page" data-page="calendar">
         <span class="icon">▦</span> P&L Calendar
       </div>
-      <div class="nav-item" onclick="showPage('query',this)">
+      <div class="nav-item" data-action="show-page" data-page="query">
         <span class="icon">⌖</span> Query Builder
       </div>
     </nav>
@@ -81,20 +81,19 @@
       <div class="total-equity">
         <div style="display:flex;align-items:center;justify-content:space-between">
           <div class="total-equity-label">Portfolio Value</div>
-          <button id="hide-balance-btn" onclick="toggleBalanceVisibility()" title="Hide/show balances"
-            style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:4px;line-height:1"
-            onmouseenter="this.style.color='var(--text)'" onmouseleave="this.style.color='var(--muted)'">👁</button>
+          <button id="hide-balance-btn" data-action="toggle-balance" title="Hide/show balances"
+            style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;border-radius:4px;line-height:1">👁</button>
         </div>
         <div class="total-equity-val balance-val" id="sidebar-equity">—</div>
         <div class="total-equity-change" id="sidebar-change">Loading…</div>
       </div>
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px">
-        <button onclick="openProfileModal_internal()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 4px;border-radius:4px;flex-shrink:0;line-height:1" onmouseenter="this.style.color='var(--text)'" onmouseleave="this.style.color='var(--muted)'" title="Edit profile">◉</button>
+        <button class="btn-open-profile" data-action="open-profile-modal" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;border-radius:4px;flex-shrink:0;line-height:1" title="Edit profile">◉</button>
         <div style="flex:1;min-width:0">
           <div id="sidebar-name" style="font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
           <div id="user-email" style="display:none;font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
         </div>
-        <button onclick="sbSignOut()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:10px;padding:3px 6px;border-radius:4px;flex-shrink:0" onmouseenter="this.style.color='var(--red)'" onmouseleave="this.style.color='var(--muted)'">Sign out</button>
+        <button class="btn-signout" data-action="sign-out" style="background:none;border:none;cursor:pointer;font-size:10px;padding:3px 6px;border-radius:4px;flex-shrink:0">Sign out</button>
       </div>
     </div>
   </aside>
@@ -104,9 +103,9 @@
     <div class="topbar">
       <div class="topbar-title" id="page-title">Dashboard</div>
       <div class="topbar-actions">
-        <button class="btn btn-ghost" onclick="exportCSV()" style="font-size:11px">↓ Export CSV</button>
-        <button class="btn btn-ghost" onclick="openAddInvestment()">+ Add Investment</button>
-        <button class="btn btn-primary" onclick="openAddTrade()">+ Log Trade</button>
+        <button class="btn btn-ghost" data-action="export-csv" style="font-size:11px">↓ Export CSV</button>
+        <button class="btn btn-ghost" data-action="open-add-investment">+ Add Investment</button>
+        <button class="btn btn-primary" data-action="open-add-trade">+ Log Trade</button>
       </div>
     </div>
 
@@ -188,10 +187,10 @@
           <div class="table-header">
             <div class="table-title" id="recent-trades-title">This Month's Trades</div>
             <div class="table-filters">
-              <button class="filter-btn active" onclick="filterRecent('All',this)">All</button>
-              <button class="filter-btn" onclick="filterRecent('Crypto',this)">Crypto</button>
-              <button class="filter-btn" onclick="filterRecent('Forex',this)">Forex</button>
-              <button class="filter-btn" onclick="filterRecent('Stocks',this)">Stocks</button>
+              <button class="filter-btn active" data-action="filter-recent" data-filter="All">All</button>
+              <button class="filter-btn" data-action="filter-recent" data-filter="Crypto">Crypto</button>
+              <button class="filter-btn" data-action="filter-recent" data-filter="Forex">Forex</button>
+              <button class="filter-btn" data-action="filter-recent" data-filter="Stocks">Stocks</button>
             </div>
           </div>
           <div style="max-height:340px;overflow-y:auto">
@@ -247,10 +246,10 @@
             <div class="table-title">All Trades</div>
             <div style="display:flex;gap:6px;align-items:center">
               <div class="table-filters">
-                <button class="filter-btn active" onclick="filterAll('All',this)">All</button>
-                <button class="filter-btn" onclick="filterAll('Open',this)">Open</button>
-                <button class="filter-btn" onclick="filterAll('Win',this)">Wins</button>
-                <button class="filter-btn" onclick="filterAll('Loss',this)">Losses</button>
+                <button class="filter-btn active" data-action="filter-all" data-filter="All">All</button>
+                <button class="filter-btn" data-action="filter-all" data-filter="Open">Open</button>
+                <button class="filter-btn" data-action="filter-all" data-filter="Win">Wins</button>
+                <button class="filter-btn" data-action="filter-all" data-filter="Loss">Losses</button>
               </div>
             </div>
           </div>
@@ -371,7 +370,7 @@
             <div class="table-title">Holdings</div>
             <div style="display:flex;align-items:center;gap:10px">
               <span id="price-status" style="font-family:var(--mono);font-size:10px;color:var(--muted)">Prices loading…</span>
-              <button onclick="fetchLivePrices()" class="btn btn-ghost" style="font-size:10px;padding:4px 10px">⟳ Refresh</button>
+              <button data-action="fetch-live-prices" class="btn btn-ghost" style="font-size:10px;padding:4px 10px">⟳ Refresh</button>
             </div>
           </div>
           <div id="holdings-list"></div>
@@ -381,7 +380,7 @@
         <div class="table-card" id="realized-history-card" style="display:none">
           <div class="table-header">
             <div class="table-title">Realized P&L History</div>
-            <button onclick="clearRealizedHistory()" class="btn btn-ghost" style="font-size:10px;padding:4px 10px;color:var(--red)">Clear History</button>
+            <button data-action="clear-realized-history" class="btn btn-ghost" style="font-size:10px;padding:4px 10px;color:var(--red)">Clear History</button>
           </div>
           <div style="max-height:300px;overflow-y:auto">
             <table>
@@ -455,9 +454,9 @@
           <div class="chart-header">
             <div class="chart-title">P&L Calendar</div>
             <div style="display:flex;align-items:center;gap:8px">
-              <button onclick="calPrevMonth()" class="btn btn-ghost" style="padding:4px 10px;font-size:12px">‹</button>
+              <button data-action="cal-prev-month" class="btn btn-ghost" style="padding:4px 10px;font-size:12px">‹</button>
               <span id="cal-month-label" style="font-family:var(--mono);font-size:12px;font-weight:600;min-width:120px;text-align:center"></span>
-              <button onclick="calNextMonth()" class="btn btn-ghost" style="padding:4px 10px;font-size:12px">›</button>
+              <button data-action="cal-next-month" class="btn btn-ghost" style="padding:4px 10px;font-size:12px">›</button>
             </div>
           </div>
           <div id="cal-stats-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px"></div>
@@ -522,7 +521,7 @@
           <div style="display:flex;flex-direction:column;gap:10px" id="conditions-wrap"></div>
 
           <div style="display:flex;gap:8px;margin-top:14px;align-items:center">
-            <button class="btn btn-ghost" onclick="addCondition()" style="font-size:11px">+ Add Filter</button>
+            <button class="btn btn-ghost" data-action="add-condition" style="font-size:11px">+ Add Filter</button>
             <div style="flex:1"></div>
             <div style="display:flex;align-items:center;gap:8px">
               <span style="font-size:11px;color:var(--muted)">Sort by</span>
@@ -537,14 +536,14 @@
                 <option value="asc">ASC</option>
               </select>
             </div>
-            <button class="btn btn-primary" onclick="runQuery()" style="font-size:11px">Run Query</button>
+            <button class="btn btn-primary" data-action="run-query" style="font-size:11px">Run Query</button>
           </div>
         </div>
 
         <div class="chart-card" id="sql-card" style="display:none">
           <div class="chart-header">
             <div class="chart-title">Generated SQL <span style="font-size:9px;color:var(--muted);font-weight:400;margin-left:8px">Supabase-ready</span></div>
-            <button class="btn btn-ghost" onclick="copySQL()" style="font-size:10px;padding:4px 10px">Copy</button>
+            <button class="btn btn-ghost" data-action="copy-sql" style="font-size:10px;padding:4px 10px">Copy</button>
           </div>
           <pre id="sql-output" style="font-family:var(--mono);font-size:11px;color:var(--green);background:var(--bg);padding:14px;border-radius:8px;overflow-x:auto;line-height:1.7;white-space:pre-wrap"></pre>
         </div>
@@ -575,7 +574,7 @@
         <div class="chart-card">
           <div class="chart-header">
             <div class="chart-title">Supabase Schema — Setup Guide</div>
-            <button class="btn btn-ghost" onclick="copySchema()" style="font-size:10px;padding:4px 10px">Copy SQL</button>
+            <button class="btn btn-ghost" data-action="copy-schema" style="font-size:10px;padding:4px 10px">Copy SQL</button>
           </div>
           <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6">Run this in your Supabase SQL Editor to set up TradeLog. Creates all tables, indexes for fast querying, and row-level security so only you can see your data.</p>
           <pre id="schema-sql" style="font-family:var(--mono);font-size:11px;color:var(--text);background:var(--bg);padding:16px;border-radius:8px;overflow-x:auto;line-height:1.8;white-space:pre-wrap"></pre>
@@ -661,8 +660,8 @@
       </div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal('trade-modal')">Cancel</button>
-      <button class="btn btn-primary" id="log-trade-btn" onclick="saveTrade()">Log Trade</button>
+      <button class="btn btn-ghost" data-action="close-modal" data-modal="trade-modal">Cancel</button>
+      <button class="btn btn-primary" id="log-trade-btn" data-action="save-trade">Log Trade</button>
     </div>
     <input type="hidden" id="t-edit-id">
   </div>
@@ -682,8 +681,8 @@
       <input class="form-input" type="date" id="ct-date" style="width:100%">
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal('close-trade-modal')">Cancel</button>
-      <button class="btn btn-primary" id="close-trade-btn" onclick="closeTradeSubmit()">Close Trade</button>
+      <button class="btn btn-ghost" data-action="close-modal" data-modal="close-trade-modal">Cancel</button>
+      <button class="btn btn-primary" id="close-trade-btn" data-action="close-trade-submit">Close Trade</button>
     </div>
     <input type="hidden" id="ct-trade-id">
   </div>
@@ -726,8 +725,8 @@
       </div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal('invest-modal')">Cancel</button>
-      <button class="btn btn-primary" id="add-invest-btn" onclick="saveInvestment()">Add Holding</button>
+      <button class="btn btn-ghost" data-action="close-modal" data-modal="invest-modal">Cancel</button>
+      <button class="btn btn-primary" id="add-invest-btn" data-action="save-investment">Add Holding</button>
     </div>
     <input type="hidden" id="i-edit-id">
   </div>
@@ -740,14 +739,14 @@
 
     <!-- Avatar preview + upload -->
     <div style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:24px">
-      <div id="profile-avatar-preview" style="width:80px;height:80px;border-radius:50%;background:var(--green-dim);border:2px solid var(--green);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:28px;font-weight:700;color:var(--green);overflow:hidden;cursor:pointer;position:relative" onclick="document.getElementById('profile-photo-input').click()">
+      <div id="profile-avatar-preview" style="width:80px;height:80px;border-radius:50%;background:var(--green-dim);border:2px solid var(--green);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:28px;font-weight:700;color:var(--green);overflow:hidden;cursor:pointer;position:relative" data-action="trigger-photo-upload">
         <span id="profile-avatar-initials">?</span>
         <img id="profile-avatar-img" style="display:none;width:100%;height:100%;object-fit:cover;position:absolute;inset:0">
-        <div style="position:absolute;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.15s;border-radius:50%" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0">
+        <div class="avatar-photo-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;border-radius:50%">
           <span style="font-size:18px">📷</span>
         </div>
       </div>
-      <input type="file" id="profile-photo-input" accept="image/*" style="display:none" onchange="handleProfilePhoto(this)">
+      <input type="file" id="profile-photo-input" accept="image/*" style="display:none">
       <div style="font-size:10px;color:var(--muted)">Click avatar to upload photo</div>
     </div>
 
@@ -755,6 +754,7 @@
       <div class="form-group">
         <label class="form-label">Display Name</label>
         <input class="form-input" id="profile-name-input" placeholder="Your name" style="width:100%">
+        <div id="profile-name-status" style="font-size:10px;min-height:14px;margin-top:4px"></div>
       </div>
       <div class="form-group">
         <label class="form-label">Email</label>
@@ -763,8 +763,8 @@
     </div>
 
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal('profile-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
+      <button class="btn btn-ghost" data-action="close-modal" data-modal="profile-modal">Cancel</button>
+      <button class="btn btn-primary" data-action="save-profile">Save Profile</button>
     </div>
   </div>
 </div>
@@ -777,11 +777,11 @@
     <div class="form-grid">
       <div class="form-group">
         <label class="form-label">Exit Price ($)</label>
-        <input class="form-input" type="number" placeholder="0.00" id="cp-exit-price" oninput="updateClosePnl()">
+        <input class="form-input" type="number" placeholder="0.00" id="cp-exit-price">
       </div>
       <div class="form-group">
         <label class="form-label">Qty to Sell</label>
-        <input class="form-input" type="number" placeholder="0.00" id="cp-qty" oninput="updateClosePnl()">
+        <input class="form-input" type="number" placeholder="0.00" id="cp-qty">
       </div>
       <div class="form-group">
         <label class="form-label">Close Date</label>
@@ -789,7 +789,7 @@
       </div>
       <div class="form-group">
         <label class="form-label">Close Type</label>
-        <select class="form-select" id="cp-type" onchange="onCloseTypeChange()">
+        <select class="form-select" id="cp-type">
           <option value="full">Full Close</option>
           <option value="partial">Partial Close</option>
         </select>
@@ -801,8 +801,8 @@
       <div><div style="color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Return %</div><div id="cp-ret-val" style="font-weight:700;font-size:14px">—</div></div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal('close-position-modal')">Cancel</button>
-      <button class="btn btn-primary" id="cp-submit-btn" onclick="submitClosePosition()">Close Position</button>
+      <button class="btn btn-ghost" data-action="close-modal" data-modal="close-position-modal">Cancel</button>
+      <button class="btn btn-primary" id="cp-submit-btn" data-action="submit-close-position">Close Position</button>
     </div>
     <input type="hidden" id="cp-holding-id">
   </div>
