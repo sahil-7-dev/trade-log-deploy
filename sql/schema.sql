@@ -59,11 +59,14 @@ create table profiles (
 
 create unique index idx_profiles_display_name_lower on profiles (lower(display_name));
 
--- One row per user: cash balance + realized (closed-position) P&L history.
+-- One row per user: cash balance + realized (closed-position) P&L history +
+-- trading balance (separate from cash — tracks a notional trading account
+-- that moves with realized trade P&L, plus manual deposits).
 -- Upserted via PostgREST on_conflict=user_id, so no separate insert/update path needed.
 create table user_settings (
   user_id           uuid primary key references auth.users(id) on delete cascade,
   cash_balance      numeric(18,2) not null default 0,
+  trading_balance   numeric(18,2) not null default 0,
   realized_history  jsonb not null default '[]'::jsonb,
   updated_at        timestamptz default now()
 );

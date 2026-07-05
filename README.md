@@ -20,12 +20,15 @@ A single-page trading journal and portfolio tracker for crypto, forex, and stock
 - Entry/exit price, size, SL/TP, R:R, setup tags, and free-text notes
 - Auto-computed P&L and win/loss status (generated columns in Postgres — never drifts from source data)
 - Filterable table (All / Open / Wins / Losses), CSV export
+- **Trading balance** that moves with realized P&L — closing a trade at +$1 nudges the balance up by $1, a −$0.50 loss nudges it down, automatically, with editing or deleting a trade correctly reversing its effect. Deposit additional funds anytime via "+ Add Funds"
 
 **Portfolio / Investing**
 - Buy/sell tracking with live crypto prices (CoinGecko)
-- Cash balance that automatically debits on buy, credits on sell, and adjusts correctly on edit or delete — so total equity (cash + holdings) always reconciles
+- **Cash balance** that automatically debits on buy, credits on sell, and adjusts correctly on edit or delete — so total equity (cash + holdings) always reconciles. Deposit funds directly anytime via "+ Deposit"
 - Full or partial position closing with realized P&L history
-- Cash balance and realized history sync to Supabase (`user_settings` table), not just the browser — consistent across devices and sign-ins
+- Cash balance, trading balance, and realized history all sync to Supabase (`user_settings` table), not just the browser — consistent across devices and sign-ins
+
+Note the two balances track different things by design: **cash balance** is a buy/sell ledger (debits on purchase, credits on sale), while **trading balance** is a running equity figure driven by realized trade P&L plus manual deposits — it never gets debited by "buying" anything, since a trade isn't a purchase of an asset you hold.
 
 **Analytics & Tools**
 - Equity curve, win/loss split, R:R distribution, win rate by asset
@@ -121,7 +124,7 @@ Opens at `http://localhost:3000`. `config.js` is gitignored — it will never be
 |---|---|---|
 | `trades` | Trade log entries | P&L and status are Postgres generated columns — always derived, never stale |
 | `investments` | Portfolio holdings | — |
-| `user_settings` | Cash balance + realized (closed-position) P&L history | One row per user, upserted via `on_conflict=user_id` |
+| `user_settings` | Cash balance + trading balance + realized (closed-position) P&L history | One row per user, upserted via `on_conflict=user_id` |
 | `profiles` | Display name | Case-insensitive **unique index** on `display_name` |
 
 All four tables have Row Level Security enabled, scoped to `auth.uid() = user_id`. Full definitions, indexes, and the `is_display_name_available()` RPC function are in `sql/schema.sql`.

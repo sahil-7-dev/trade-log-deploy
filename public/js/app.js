@@ -29,6 +29,7 @@ let HOLDINGS = [];
 let chartInstances = {};
 let realizedHistory = JSON.parse(localStorage.getItem('realized_history') || '[]');
 let cashBalance     = parseFloat(localStorage.getItem('cash_balance') || '0');
+let tradingBalance  = parseFloat(localStorage.getItem('trading_balance') || '0');
 let livePrices = {};       // { BTC: 65000, ETH: 3200, ... }
 let priceRefreshTimer = null;
 let lastPriceUpdate = null;
@@ -343,7 +344,7 @@ async function sbUpdate(table, id, body) {
 // user_settings is a single row per user (cash balance + realized history).
 // POST with on_conflict + merge-duplicates does an atomic upsert in one call.
 async function sbGetSettings() {
-  const res = await sbRequest("GET", `user_settings?user_id=eq.${currentUser.id}&select=cash_balance,realized_history`);
+  const res = await sbRequest("GET", `user_settings?user_id=eq.${currentUser.id}&select=cash_balance,trading_balance,realized_history`);
   if (!res.ok) throw new Error(`Settings load failed: ${res.status}`);
   return res.json();
 }
@@ -352,7 +353,7 @@ async function sbUpsertSettings() {
   const res = await sbRequest(
     "POST",
     "user_settings?on_conflict=user_id",
-    { user_id: currentUser.id, cash_balance: cashBalance, realized_history: realizedHistory },
+    { user_id: currentUser.id, cash_balance: cashBalance, trading_balance: tradingBalance, realized_history: realizedHistory },
     false,
     "resolution=merge-duplicates,return=minimal"
   );
@@ -418,13 +419,15 @@ async function loadAllData() {
     if (Array.isArray(settings) && settings.length > 0) {
       // Row exists on the server — it's the source of truth across devices
       cashBalance = parseFloat(settings[0].cash_balance) || 0;
+      tradingBalance = parseFloat(settings[0].trading_balance) || 0;
       realizedHistory = Array.isArray(settings[0].realized_history) ? settings[0].realized_history : [];
       safeLocalSet('cash_balance', cashBalance.toString());
+      safeLocalSet('trading_balance', tradingBalance.toString());
       safeLocalSet('realized_history', JSON.stringify(realizedHistory));
     } else if (settings !== null) {
       // No row yet — first login since this feature shipped. Push whatever's
-      // in the local cache (cashBalance/realizedHistory already loaded from
-      // localStorage at startup) up to Supabase so it isn't lost.
+      // in the local cache (cashBalance/tradingBalance/realizedHistory already
+      // loaded from localStorage at startup) up to Supabase so it isn't lost.
       sbUpsertSettings().catch(e => log.warn('[loadAllData] Initial settings migration failed:', e.message));
     }
     // If settings === null (fetch failed, e.g. offline), keep using the
@@ -636,6 +639,7 @@ function renderAll() {
   renderHoldings();
   renderRealizedHistory();
   renderInvestingStats();
+  renderTradingBalance();
   renderHeatmap();
   renderCalendar();
   renderDailyPnlLog();
@@ -791,6 +795,41 @@ function updateStatCards(s) {
 // ─── MODAL ────────────────────────────────────────────────────────────────────
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ─── ADD FUNDS (shared modal — deposits to either cash or trading balance) ───
+function openAddFundsModal(target) {
+  document.getElementById('af-target').value = target;
+  document.getElementById('af-title').textContent = target === 'trading' ? 'Add Funds — Trading Balance' : 'Deposit Cash';
+  document.getElementById('af-sub').textContent = target === 'trading'
+    ? 'Adds directly to your trading balance, separate from realized trade P&L.'
+    : 'Adds directly to your investment cash balance.';
+  document.getElementById('af-amount').value = '';
+  openModal('add-funds-modal');
+}
+
+async function submitAddFunds() {
+  const target = document.getElementById('af-target').value;
+  const amount = parseFloat(document.getElementById('af-amount').value);
+  if (!amount || amount <= 0) return toast('Enter an amount greater than 0', 'err');
+
+  const btn = document.getElementById('af-submit-btn');
+  btn.textContent = 'Adding…'; btn.disabled = true;
+
+  try {
+    if (target === 'trading') {
+      tradingBalance = parseFloat((tradingBalance + amount).toFixed(2));
+    } else {
+      cashBalance = parseFloat((cashBalance + amount).toFixed(2));
+    }
+    await saveUserSettings();
+    closeModal('add-funds-modal');
+    renderAll();
+    toast(`$${amount.toFixed(2)} added ✓`);
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+  btn.textContent = 'Add Funds'; btn.disabled = false;
+}
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.modal-overlay').forEach(o => {
     o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
@@ -873,13 +912,31 @@ async function saveTrade() {
       const updated = result && result[0] ? normalizeTrade(result[0]) : null;
       if (updated) {
         const idx = TRADES.findIndex(t => t.id === editId);
+        const oldPnl = idx !== -1 ? (TRADES[idx].pnl || 0) : 0;
         if (idx !== -1) TRADES[idx] = updated;
+
+        // Trading balance tracks realized P&L, not the trade itself — only
+        // the delta between old and new realized P&L needs to move it
+        // (covers going Open→Closed, Closed→Open, or a correction to an
+        // already-closed trade's numbers).
+        const delta = parseFloat(((updated.pnl || 0) - oldPnl).toFixed(2));
+        if (delta !== 0) {
+          tradingBalance = parseFloat((tradingBalance + delta).toFixed(2));
+          await saveUserSettings();
+        }
       }
       toast('Trade updated ✓');
     } else {
       const result = await sbInsert('trades', { ...payload, user_id: currentUser.id });
       if (result && result[0]) {
-        TRADES.unshift(normalizeTrade(result[0]));
+        const inserted = normalizeTrade(result[0]);
+        TRADES.unshift(inserted);
+
+        // Logged already-closed (exit filled in at creation) — realize its P&L immediately.
+        if (inserted.pnl) {
+          tradingBalance = parseFloat((tradingBalance + inserted.pnl).toFixed(2));
+          await saveUserSettings();
+        }
         toast('Trade logged ✓');
       }
     }
@@ -924,15 +981,22 @@ async function closeTradeSubmit() {
   btn.textContent = 'Closing…'; btn.disabled = true;
 
   try {
+    const oldPnl = t.pnl || 0; // 0 for an open trade, but computed generically for safety
     const result = await sbUpdate('trades', id, { exit, date, rr });
     const updated = result && result[0] ? normalizeTrade(result[0]) : null;
     if (updated) {
       const idx = TRADES.findIndex(t => t.id === id);
       if (idx !== -1) TRADES[idx] = updated;
+
+      const delta = parseFloat(((updated.pnl || 0) - oldPnl).toFixed(2));
+      if (delta !== 0) {
+        tradingBalance = parseFloat((tradingBalance + delta).toFixed(2));
+        await saveUserSettings();
+      }
     }
     closeModal('close-trade-modal');
     renderAll();
-    toast('Trade closed ✓');
+    toast(`Trade closed ✓  Trading balance updated`);
   } catch (e) {
     toast(e.message, 'err');
   }
@@ -1255,7 +1319,7 @@ async function saveInvestment() {
       }
 
       cashBalance = parseFloat((cashBalance + oldCost - newCost).toFixed(2));
-      await saveRealizedData();
+      await saveUserSettings();
       toast('Investment updated ✓');
     } else {
       // ADD MODE — buying with cash, so deduct the cost from cash balance
@@ -1273,7 +1337,7 @@ async function saveInvestment() {
 
         const cost = parseFloat((qty * buy_price).toFixed(2));
         cashBalance = parseFloat((cashBalance - cost).toFixed(2));
-        await saveRealizedData();
+        await saveUserSettings();
 
         toast(`Investment added ✓  $${cost.toFixed(2)} deducted from cash`);
       }
@@ -1295,10 +1359,21 @@ async function saveInvestment() {
 
 // ─── DELETE TRADE ─────────────────────────────────────────────────────────────
 async function deleteTrade(id) {
-  if (!confirm('Delete this trade?')) return;
+  const t = TRADES.find(t => t.id === id);
+  const hasPnl = t && t.pnl;
+  const confirmMsg = hasPnl
+    ? `Delete this trade? Its realized P&L ($${t.pnl.toFixed(2)}) will be reversed from your trading balance.`
+    : 'Delete this trade?';
+  if (!confirm(confirmMsg)) return;
   try {
     await sbDelete('trades', id);
     TRADES = TRADES.filter(t => t.id !== id);
+
+    if (hasPnl) {
+      tradingBalance = parseFloat((tradingBalance - t.pnl).toFixed(2));
+      await saveUserSettings();
+    }
+
     renderAll();
     toast('Trade deleted');
   } catch (e) {
@@ -1317,7 +1392,7 @@ async function deleteHolding(id) {
     if (h) {
       const refund = parseFloat((h.qty * h.buyPrice).toFixed(2));
       cashBalance = parseFloat((cashBalance + refund).toFixed(2));
-      await saveRealizedData();
+      await saveUserSettings();
     }
 
     renderAll();
@@ -1395,14 +1470,15 @@ function safeLocalSet(key, value) {
   }
 }
 
-async function saveRealizedData() {
+async function saveUserSettings() {
   safeLocalSet('realized_history', JSON.stringify(realizedHistory));
   safeLocalSet('cash_balance', cashBalance.toString());
+  safeLocalSet('trading_balance', tradingBalance.toString());
   try {
     await sbUpsertSettings();
   } catch (e) {
-    log.warn('[saveRealizedData] Supabase sync failed, kept locally:', e.message);
-    toast('Cash balance saved locally — sync to server failed', 'err');
+    log.warn('[saveUserSettings] Supabase sync failed, kept locally:', e.message);
+    toast('Saved locally — sync to server failed', 'err');
   }
 }
 
@@ -1410,7 +1486,7 @@ async function clearRealizedHistory() {
   if (!confirm('Clear all realized P&L history and reset cash balance to $0?')) return;
   realizedHistory = [];
   cashBalance = 0;
-  await saveRealizedData();
+  await saveUserSettings();
   renderRealizedHistory();
   renderInvestingStats();
   toast('Realized history cleared');
@@ -1526,7 +1602,7 @@ async function submitClosePosition() {
     realizedHistory.unshift(record);
 
     cashBalance = parseFloat((cashBalance + proceeds).toFixed(2));
-    await saveRealizedData();
+    await saveUserSettings();
 
     closeModal('close-position-modal');
     renderAll();
@@ -1581,6 +1657,13 @@ function renderInvestingStats() {
   set('inv-total-equity', `<span class="balance-val">$${totalEquity.toFixed(2)}</span>`);
   const eqEl = document.getElementById('inv-total-equity');
   if (eqEl) eqEl.className = 'stat-val ' + (totalEquity >= 0 ? 'green' : 'red');
+}
+
+function renderTradingBalance() {
+  const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+  set('tl-balance', `<span class="balance-val">$${tradingBalance.toFixed(2)}</span>`);
+  const el = document.getElementById('tl-balance');
+  if (el) el.className = 'stat-val ' + (tradingBalance >= 0 ? 'green' : 'red');
 }
 
 function renderTrades() {
@@ -2311,6 +2394,9 @@ document.addEventListener('click', (e) => {
     case 'open-profile-modal': openProfileModal_internal(); break;
     case 'export-csv': exportCSV(); break;
     case 'open-add-investment': openAddInvestment(); break;
+    case 'open-deposit-cash': openAddFundsModal('cash'); break;
+    case 'open-add-funds': openAddFundsModal('trading'); break;
+    case 'submit-add-funds': submitAddFunds(); break;
     case 'open-add-trade': openAddTrade(); break;
     case 'filter-recent': filterRecent(t.dataset.filter, t); break;
     case 'filter-all': filterAll(t.dataset.filter, t); break;

@@ -22,6 +22,7 @@ If you ran an earlier version of `schema.sql`, re-running the whole file will er
 create table user_settings (
   user_id           uuid primary key references auth.users(id) on delete cascade,
   cash_balance      numeric(18,2) not null default 0,
+  trading_balance   numeric(18,2) not null default 0,
   realized_history  jsonb not null default '[]'::jsonb,
   updated_at        timestamptz default now()
 );
@@ -30,6 +31,12 @@ alter table user_settings enable row level security;
 
 create policy "Users manage own settings"
   on user_settings for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+```
+
+Already created `user_settings` before the trading balance feature shipped? Just add the column:
+
+```sql
+alter table user_settings add column if not exists trading_balance numeric(18,2) not null default 0;
 ```
 
 **`profiles`** (unique display names):
