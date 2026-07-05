@@ -1,106 +1,144 @@
-# TradeLog — Personal Trading Journal
+# TradeLog
 
-A single-page trading journal and portfolio tracker for crypto, forex, and stock trades. Built on Supabase (auth + Postgres) with live crypto pricing via CoinGecko.
+A single-page trading journal and portfolio tracker for crypto, forex, and stock trades — built on Supabase (auth + Postgres + Row Level Security) with live crypto pricing via CoinGecko. No framework, no build tooling beyond a small config-generation step, deployable to Vercel in minutes.
+
+## Table of Contents
+
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Database Schema](#database-schema)
+- [Security](#security)
+- [Known Limitations](#known-limitations)
+- [License](#license)
 
 ## Features
 
-- Trade journal with entry/exit, P&L, RR, setup tags, and notes
-- Portfolio tracker with live crypto prices, realized P&L, and cash balance
-- Close position flow (full or partial) with automatic realized P&L tracking
+**Trade Log**
+- Entry/exit price, size, SL/TP, R:R, setup tags, and free-text notes
+- Auto-computed P&L and win/loss status (generated columns in Postgres — never drifts from source data)
+- Filterable table (All / Open / Wins / Losses), CSV export
+
+**Portfolio / Investing**
+- Buy/sell tracking with live crypto prices (CoinGecko)
+- Cash balance that automatically debits on buy, credits on sell, and adjusts correctly on edit or delete — so total equity (cash + holdings) always reconciles
+- Full or partial position closing with realized P&L history
+- Cash balance and realized history sync to Supabase (`user_settings` table), not just the browser — consistent across devices and sign-ins
+
+**Analytics & Tools**
+- Equity curve, win/loss split, R:R distribution, win rate by asset
 - P&L calendar with daily breakdown and a running daily log
-- Analytics dashboard: equity curve, win/loss split, RR distribution, win rate by asset
-- Visual query builder with auto-generated SQL
-- CSV export
-- USD / INR currency toggle
-- Hide-balance privacy toggle
-- Editable profile (name + photo, stored locally)
-- Persistent login (auto-refreshing session, no re-login needed across days)
+- Visual query builder with live SQL preview
+
+**Account**
+- Email/password auth via Supabase, with automatic token refresh (no re-login mid-session)
+- Editable profile with a globally unique, case-insensitive display name — live "available / taken" check as you type, enforced by a database constraint (not just client-side validation)
+- USD / INR currency toggle, hide-balance privacy toggle
+
+## Tech Stack
+
+- **Frontend:** Vanilla HTML/CSS/JS — no framework, no bundler
+- **Charts:** [Chart.js](https://www.chartjs.org/)
+- **Backend:** [Supabase](https://supabase.com) (Postgres + Auth + PostgREST, accessed directly via `fetch`, no client SDK)
+- **Prices:** [CoinGecko API](https://www.coingecko.com/en/api)
+- **Hosting:** [Vercel](https://vercel.com), static output with a one-step build
+
+## Architecture
+
+**Config generation, not hardcoded keys.** `public/js/config.js` (which holds live API keys) is gitignored and never committed. On Vercel, `scripts/build.js` runs as the build command and generates it from environment variables at deploy time. Locally, you copy `config.example.js` → `config.js` by hand. Either way, the Supabase URL is normalized (stripped of any accidental trailing path) before it's written, so a copy-paste mistake in the URL can't silently break auth.
+
+**Strict CSP, no inline scripts.** `vercel.json` sets a locked-down `Content-Security-Policy` (`script-src 'self'` plus the Chart.js CDN — no `unsafe-inline`, no `unsafe-eval`). Every interactive element uses `data-action="..."` attributes routed through a single set of delegated `click`/`change`/`input`/`keydown` listeners in `app.js`, instead of inline `onclick` handlers — so the CSP stays strict without sacrificing functionality.
+
+**Security enforced at the database, not just the client.** Every table has Row Level Security scoped to `auth.uid()`. The display-name uniqueness check is a `SECURITY DEFINER` Postgres function that returns only `true`/`false` — the client never gets read access to any other user's row, and the actual uniqueness guarantee comes from a database constraint, not client-side validation.
 
 ## Project Structure
 
 ```
 tradelog/
-├── public/                  # Deployable static site (this is the Vercel root)
+├── public/                  # Deployable static site (Vercel root)
 │   ├── index.html           # App shell and all markup
 │   ├── css/
 │   │   └── styles.css       # All styling
 │   └── js/
-│       ├── config.js        # Your live API keys (gitignored — create from config.example.js)
+│       ├── config.js        # Generated at build time — gitignored, never committed
 │       ├── config.example.js
-│       └── app.js           # All application logic
+│       └── app.js           # All application logic (auth, data, rendering, event delegation)
+├── scripts/
+│   └── build.js             # Generates config.js from env vars; runs automatically on Vercel
 ├── sql/
-│   └── schema.sql           # Supabase table + RLS setup (also viewable in-app under DB Schema)
+│   └── schema.sql           # Full Supabase schema: tables, indexes, RLS policies, RPC function
 ├── docs/
-│   └── SETUP.md             # Step-by-step setup guide
+│   └── SETUP.md             # Step-by-step setup + troubleshooting guide
 ├── package.json
-├── vercel.json
+├── vercel.json               # Build command, output dir, security headers (CSP, HSTS, etc.)
 ├── .gitignore
 └── README.md
 ```
 
-## Quick Start
+## Getting Started
+
+For full step-by-step instructions (including Supabase project creation and troubleshooting), see **[docs/SETUP.md](docs/SETUP.md)**. Quick version:
 
 ### 1. Set up Supabase
 
-1. Create a project at [supabase.com](https://supabase.com)
-2. Go to **SQL Editor** and run the contents of `sql/schema.sql`
-3. Go to **Settings → API** and copy your **Project URL** and **anon public key**
+1. Create a project at [supabase.com](https://supabase.com).
+2. Open **SQL Editor** and run the full contents of `sql/schema.sql`. This creates all four tables (`trades`, `investments`, `profiles`, `user_settings`), their indexes, RLS policies, and the display-name availability function.
+3. Go to **Settings → API** and copy your **Project URL** (bare origin, e.g. `https://xxxxx.supabase.co` — no `/rest/v1` or other path suffix) and **anon public key**.
 
-### 2. Set up CoinGecko (optional, for live crypto prices)
+### 2. (Optional) Set up CoinGecko
 
-1. Create a free account at [coingecko.com/en/api/pricing](https://www.coingecko.com/en/api/pricing)
-2. Get a **Demo API key**
+Create a free account at [coingecko.com/en/api/pricing](https://www.coingecko.com/en/api/pricing) and grab a **Demo API key** for live crypto prices. The app works without one, at a lower rate limit.
 
-### 3. Configure the app
+### 3. Local development
 
 ```bash
 cp public/js/config.example.js public/js/config.js
 ```
 
-Edit `public/js/config.js` and fill in your keys:
-
-```js
-const APP_CONFIG = {
-  SUPABASE_URL: 'https://your-project.supabase.co',
-  SUPABASE_ANON_KEY: 'your-anon-key',
-  COINGECKO_API_KEY: 'your-coingecko-demo-key', // optional
-};
-```
-
-`config.js` is gitignored — it will never be committed.
-
-### 4. Run locally
+Fill in your keys in `public/js/config.js`, then:
 
 ```bash
 npm run dev
 ```
 
-Opens at `http://localhost:3000`. Sign up with any email/password to create your account (handled by Supabase Auth).
+Opens at `http://localhost:3000`. `config.js` is gitignored — it will never be committed.
 
-### 5. Deploy to Vercel
+### 4. Deploy to Vercel
 
-```bash
-npm install -g vercel
-vercel --prod
-```
+1. Push this repo to GitHub.
+2. Import it into Vercel.
+3. In **Project → Settings → Environment Variables**, add:
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `COINGECKO_API_KEY` (optional)
+4. Deploy. Vercel runs `node scripts/build.js` automatically (configured in `vercel.json`), which generates `config.js` from those env vars at build time — the file itself never touches your git history.
 
-Vercel auto-detects `vercel.json` and serves the `public/` folder as the site root. Since `config.js` is gitignored, you'll need to either:
+## Database Schema
 
-- **Option A (simple):** Manually upload `config.js` content directly in the Vercel dashboard as part of your deployed files (not ideal for git-based deploys)
-- **Option B (recommended):** Don't gitignore `config.js` if this is a private repo only you access — comment out that line in `.gitignore`. For a personal single-user tool, the anon key alone is not sensitive (Supabase Row Level Security still protects all data) — but never commit it to a public repo.
+| Table | Purpose | Key constraint |
+|---|---|---|
+| `trades` | Trade log entries | P&L and status are Postgres generated columns — always derived, never stale |
+| `investments` | Portfolio holdings | — |
+| `user_settings` | Cash balance + realized (closed-position) P&L history | One row per user, upserted via `on_conflict=user_id` |
+| `profiles` | Display name | Case-insensitive **unique index** on `display_name` |
 
-## Security Notes
+All four tables have Row Level Security enabled, scoped to `auth.uid() = user_id`. Full definitions, indexes, and the `is_display_name_available()` RPC function are in `sql/schema.sql`.
 
-- The Supabase **anon key** is safe to expose client-side — it has no special privileges. All data access is protected by **Row Level Security (RLS)** policies defined in `sql/schema.sql`, which restrict each user to only their own rows.
-- The CoinGecko key only grants higher API rate limits — not sensitive.
-- Your trading data, profile photo, and balance-visibility preference are stored in `localStorage` and Supabase, scoped to your account only.
+## Security
 
-## Tech Stack
+- **Row Level Security everywhere.** Every table restricts reads and writes to the authenticated user's own rows. This holds even if client-side code is tampered with (e.g. via browser DevTools) — Postgres checks `auth.uid()` from the JWT server-side, not anything sent in the request body.
+- **Strict CSP.** No inline scripts, no `unsafe-eval`. Combined with `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and HSTS (see `vercel.json`).
+- **The Supabase anon key is safe to expose client-side** — it carries no special privileges on its own; RLS is what actually protects data.
+- **Narrow-scope RPC for uniqueness checks.** `is_display_name_available()` runs as `SECURITY DEFINER` (so it can see across all users despite RLS) but returns only a boolean — never row data — keeping the privilege escalation as narrow as possible.
+- **XSS-safe rendering.** All user-supplied text (trade notes, symbols, display names, etc.) is HTML-escaped before being inserted into the DOM.
 
-- Vanilla HTML/CSS/JS — no build step, no framework
-- [Chart.js](https://www.chartjs.org/) for all charts
-- [Supabase](https://supabase.com) for auth + Postgres database
-- [CoinGecko API](https://www.coingecko.com/en/api) for live crypto prices
+## Known Limitations
+
+- Single-user-per-account personal tool — there's no team/sharing model.
+- Profile photos are stored client-side only (compressed to a base64 data URL in `localStorage`), not synced across devices.
+- Currency toggle covers USD/INR display only; all figures are stored in a single base currency internally.
 
 ## License
 
