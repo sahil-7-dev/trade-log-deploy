@@ -99,13 +99,29 @@ async function sbSignUp() {
   const pass  = document.getElementById('auth-pass').value;
   if (!email || !pass) return setAuthMsg('Enter email and password', 'red');
   setAuthMsg('Creating account…', 'muted');
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-    method: 'POST', headers: SB_HEADERS,
-    body: JSON.stringify({ email, password: pass })
-  });
-  const data = await res.json();
-  if (data.error || data.error_description) return setAuthMsg(data.error_description || data.error.message || 'Signup failed', 'red');
-  setAuthMsg('Check your email to confirm, then sign in.', 'green');
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+      method: 'POST', headers: SB_HEADERS,
+      body: JSON.stringify({ email, password: pass })
+    });
+    let data;
+    try {
+      data = await res.json();
+    } catch (parseErr) {
+      // Response wasn't JSON — almost always means SUPABASE_URL is wrong/missing
+      // (fetch hit a 404/HTML page instead of the real Supabase API).
+      throw new Error('Unexpected server response. Check that config.js has valid Supabase settings.');
+    }
+    if (data.error || data.error_description) {
+      return setAuthMsg(data.error_description || (data.error && data.error.message) || data.error || 'Signup failed', 'red');
+    }
+    setAuthMsg('Check your email to confirm, then sign in.', 'green');
+  } catch (e) {
+    log.error('[sbSignUp] Failed:', e.message);
+    setAuthMsg(e.message === 'Failed to fetch'
+      ? 'Network error — check your connection and try again.'
+      : e.message || 'Signup failed', 'red');
+  }
 }
 
 async function sbSignIn() {
@@ -113,17 +129,31 @@ async function sbSignIn() {
   const pass  = document.getElementById('auth-pass').value;
   if (!email || !pass) return setAuthMsg('Enter email and password', 'red');
   setAuthMsg('Signing in…', 'muted');
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-    method: 'POST', headers: SB_HEADERS,
-    body: JSON.stringify({ email, password: pass })
-  });
-  const data = await res.json();
-  if (data.error || data.error_description) return setAuthMsg(data.error_description || data.error || 'Sign in failed', 'red');
-  applySession(data);
-  document.getElementById('user-email').textContent = currentUser.email;
-  showAppShell();
-  loadProfile();
-  await loadAllData();
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST', headers: SB_HEADERS,
+      body: JSON.stringify({ email, password: pass })
+    });
+    let data;
+    try {
+      data = await res.json();
+    } catch (parseErr) {
+      throw new Error('Unexpected server response. Check that config.js has valid Supabase settings.');
+    }
+    if (data.error || data.error_description) {
+      return setAuthMsg(data.error_description || data.error || 'Sign in failed', 'red');
+    }
+    applySession(data);
+    document.getElementById('user-email').textContent = currentUser.email;
+    showAppShell();
+    loadProfile();
+    await loadAllData();
+  } catch (e) {
+    log.error('[sbSignIn] Failed:', e.message);
+    setAuthMsg(e.message === 'Failed to fetch'
+      ? 'Network error — check your connection and try again.'
+      : e.message || 'Sign in failed', 'red');
+  }
 }
 
 function applySession(data) {
