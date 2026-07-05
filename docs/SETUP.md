@@ -99,6 +99,14 @@ const APP_CONFIG = {
 };
 ```
 
+> **`SUPABASE_URL` must be the bare project URL — no trailing path.** Use
+> `https://xxxxx.supabase.co`, not `https://xxxxx.supabase.co/rest/v1/` or
+> anything with `/auth/v1` etc. tacked on. Supabase's dashboard sometimes
+> shows the REST endpoint (with `/rest/v1`) right next to the plain Project
+> URL — grab the plain one. (The app now auto-strips an accidental trailing
+> path at both build time and runtime as a safety net, but starting from the
+> right value avoids relying on that.)
+
 ## 5. Run locally
 
 No build step needed — it's plain HTML/CSS/JS.

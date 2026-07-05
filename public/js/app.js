@@ -1,5 +1,17 @@
 // ─── SUPABASE CONFIG (loaded from config.js) ─────────────────────────────────
-const SUPABASE_URL = APP_CONFIG.SUPABASE_URL;
+// Defensive normalization: strips any accidental path/trailing-slash a
+// hand-copied config.js might have (e.g. ".../rest/v1/" instead of the bare
+// project URL). The build script does the same for Vercel deploys.
+function normalizeSupabaseUrl(url) {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return String(url).replace(/\/+$/, '');
+  }
+}
+const SUPABASE_URL = normalizeSupabaseUrl(APP_CONFIG.SUPABASE_URL);
 const SUPABASE_KEY = APP_CONFIG.SUPABASE_ANON_KEY;
 const SB_HEADERS = {
   'Content-Type': 'application/json',
@@ -112,8 +124,11 @@ async function sbSignUp() {
       // (fetch hit a 404/HTML page instead of the real Supabase API).
       throw new Error('Unexpected server response. Check that config.js has valid Supabase settings.');
     }
-    if (data.error || data.error_description) {
-      return setAuthMsg(data.error_description || (data.error && data.error.message) || data.error || 'Signup failed', 'red');
+    if (!res.ok || data.error || data.error_description) {
+      const msg = data.error_description || data.msg || data.message
+        || (data.error && data.error.message) || data.error
+        || `Signup failed (${res.status})`;
+      return setAuthMsg(msg, 'red');
     }
     setAuthMsg('Check your email to confirm, then sign in.', 'green');
   } catch (e) {
@@ -140,8 +155,10 @@ async function sbSignIn() {
     } catch (parseErr) {
       throw new Error('Unexpected server response. Check that config.js has valid Supabase settings.');
     }
-    if (data.error || data.error_description) {
-      return setAuthMsg(data.error_description || data.error || 'Sign in failed', 'red');
+    if (!res.ok || data.error || data.error_description || !data.access_token) {
+      const msg = data.error_description || data.msg || data.message || data.error
+        || `Sign in failed (${res.status})`;
+      return setAuthMsg(msg, 'red');
     }
     applySession(data);
     document.getElementById('user-email').textContent = currentUser.email;

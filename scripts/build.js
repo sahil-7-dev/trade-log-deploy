@@ -9,9 +9,27 @@
 const fs   = require('fs');
 const path = require('path');
 
-const SUPABASE_URL       = process.env.SUPABASE_URL;
+// Normalize to just the bare project origin. Protects against the common
+// mistake of pasting a URL that already has /rest/v1, /auth/v1, or a
+// trailing slash baked in (e.g. from copying an API example instead of the
+// Project URL) — that produces double-path 404s like ".../rest/v1//auth/v1/...".
+function normalizeSupabaseUrl(url) {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return String(url).replace(/\/+$/, '');
+  }
+}
+
+const SUPABASE_URL       = normalizeSupabaseUrl(process.env.SUPABASE_URL);
 const SUPABASE_ANON_KEY  = process.env.SUPABASE_ANON_KEY;
 const COINGECKO_API_KEY  = process.env.COINGECKO_API_KEY || '';
+
+if (process.env.SUPABASE_URL && process.env.SUPABASE_URL !== SUPABASE_URL) {
+  console.warn(`⚠️  SUPABASE_URL had an extra path/slash — normalized "${process.env.SUPABASE_URL}" → "${SUPABASE_URL}"`);
+}
 
 // Validate required vars
 const missing = [];
