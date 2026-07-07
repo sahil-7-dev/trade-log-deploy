@@ -32,6 +32,73 @@ let cashBalance     = parseFloat(localStorage.getItem('cash_balance') || '0');
 let tradingBalance  = parseFloat(localStorage.getItem('trading_balance') || '0');
 let livePrices = {};       // { BTC: 65000, ETH: 3200, ... }
 let priceRefreshTimer = null;
+
+// ─── DEMO MODE ────────────────────────────────────────────────────────────────
+// First-time visitors with no saved session land in a fully-populated,
+// read-only demo instead of a bare sign-in wall — they can click around real
+// UI with real (fixed, fictional) data before ever creating an account.
+// Every mutating action is gated behind demoGuard() further down.
+let isDemoMode = false;
+
+const DEMO_PROFILE_NAME = 'demo_trader';
+
+// Raw inputs only — pnl/rr/status are derived by buildDemoTrades() using the
+// exact same formulas the real app (and Postgres) use, so the numbers are
+// always internally consistent, never hand-typed and possibly wrong.
+const DEMO_RAW_TRADES = [
+  { date: '2026-01-06', symbol: 'BTC',     type: 'Crypto', dir: 'Long',  entry: 42500,  exit: 44200,  size: 800, sl: 41200,  tp: 46000,  notes: 'Breakout above range high, held through a small pullback.' },
+  { date: '2026-01-14', symbol: 'EURUSD',  type: 'Forex',  dir: 'Short', entry: 1.0950, exit: 1.0870, size: 1000, sl: 1.1010, tp: 1.0800, notes: 'Faded the post-NFP spike.' },
+  { date: '2026-01-22', symbol: 'AAPL',    type: 'Stocks', dir: 'Long',  entry: 192.40, exit: 188.10, size: 600, sl: 187.00, tp: 200.00, notes: 'Earnings gap didn\'t hold, stopped out early.' },
+  { date: '2026-02-03', symbol: 'ETH',     type: 'Crypto', dir: 'Long',  entry: 2380,   exit: 2510,   size: 700, sl: 2290,  tp: 2600 },
+  { date: '2026-02-11', symbol: 'GBPUSD',  type: 'Forex',  dir: 'Long',  entry: 1.2650, exit: 1.2590, size: 900, sl: 1.2580, tp: 1.2780 },
+  { date: '2026-02-19', symbol: 'SOL',     type: 'Crypto', dir: 'Short', entry: 118.5,  exit: 109.2,  size: 500, sl: 123.0,  tp: 105.0 },
+  { date: '2026-03-02', symbol: 'NVDA',    type: 'Stocks', dir: 'Long',  entry: 725,    exit: 780,    size: 900, sl: 700,   tp: 800 },
+  { date: '2026-03-10', symbol: 'USDJPY',  type: 'Forex',  dir: 'Short', entry: 149.80, exit: 150.60, size: 700, sl: 150.50, tp: 148.00, notes: 'Stopped out — BOJ comments reversed the move.' },
+  { date: '2026-03-21', symbol: 'BTC',     type: 'Crypto', dir: 'Short', entry: 68200,  exit: 66500,  size: 1000, sl: 69500, tp: 64000 },
+  { date: '2026-04-02', symbol: 'SPY',     type: 'Stocks', dir: 'Long',  entry: 512,    exit: 508,    size: 600, sl: 505,   tp: 525 },
+  { date: '2026-04-15', symbol: 'ETH',     type: 'Crypto', dir: 'Long',  entry: 3150,   exit: 3340,   size: 800, sl: 3020,  tp: 3400 },
+  { date: '2026-04-27', symbol: 'EURUSD',  type: 'Forex',  dir: 'Long',  entry: 1.0780, exit: 1.0850, size: 900, sl: 1.0730, tp: 1.0900 },
+  { date: '2026-05-08', symbol: 'TSLA',    type: 'Stocks', dir: 'Short', entry: 245,    exit: 258,    size: 700, sl: 255,   tp: 220, notes: 'Squeeze on a short-covering rally — cut it a bit late.' },
+  { date: '2026-05-19', symbol: 'SOL',     type: 'Crypto', dir: 'Long',  entry: 142,    exit: 156,    size: 600, sl: 135,   tp: 165 },
+  { date: '2026-06-03', symbol: 'GBPUSD',  type: 'Forex',  dir: 'Short', entry: 1.2720, exit: 1.2650, size: 800, sl: 1.2780, tp: 1.2580 },
+  { date: '2026-06-14', symbol: 'BTC',     type: 'Crypto', dir: 'Long',  entry: 71000,  exit: null,   size: 900, sl: 69000, tp: 76000, notes: 'Still open — riding the range breakout.' },
+  { date: '2026-06-25', symbol: 'AAPL',    type: 'Stocks', dir: 'Long',  entry: 198.5,  exit: null,   size: 700, sl: 194.0, tp: 210.0 },
+  { date: '2026-07-02', symbol: 'ETH',     type: 'Crypto', dir: 'Short', entry: 3480,   exit: 3540,   size: 750, sl: 3550,  tp: 3300 },
+];
+
+function buildDemoTrades() {
+  return DEMO_RAW_TRADES.map((t, i) => {
+    const pnl = t.exit != null
+      ? parseFloat(((t.dir === 'Long' ? (t.exit - t.entry) / t.entry : (t.entry - t.exit) / t.entry) * t.size).toFixed(2))
+      : 0;
+    const risk = (t.exit != null && t.sl != null) ? Math.abs(t.entry - t.sl) / t.entry * t.size : 0;
+    const rr = (t.exit != null && risk > 0) ? parseFloat((pnl / risk).toFixed(4)) : null;
+    const status = t.exit == null ? 'Open'
+      : ((t.dir === 'Long' && t.exit > t.entry) || (t.dir === 'Short' && t.exit < t.entry)) ? 'Win' : 'Loss';
+    return { id: `demo-trade-${i}`, user_id: 'demo', pnl, rr, status, ...t };
+  });
+}
+
+const DEMO_RAW_HOLDINGS = [
+  { symbol: 'BTC',  type: 'Crypto', qty: 0.15, buyPrice: 45000,  curPrice: 68500 },
+  { symbol: 'ETH',  type: 'Crypto', qty: 2.2,  buyPrice: 2200,   curPrice: 3450 },
+  { symbol: 'AAPL', type: 'Stocks', qty: 12,   buyPrice: 178.50, curPrice: 195.20 },
+  { symbol: 'SOL',  type: 'Crypto', qty: 25,   buyPrice: 95.00,  curPrice: 138.00 },
+  { symbol: 'NVDA', type: 'Stocks', qty: 4,    buyPrice: 620.00, curPrice: 745.00 },
+];
+
+function buildDemoHoldings() {
+  return DEMO_RAW_HOLDINGS.map((h, i) => ({
+    id: `demo-holding-${i}`, user_id: 'demo', buy_date: '2025-11-01',
+    color: assetColor(h.symbol), livePrice: false, ...h
+  }));
+}
+
+const DEMO_CASH_BALANCE = 850.00;
+const DEMO_TRADING_STARTING_BALANCE = 1000.00;
+const DEMO_REALIZED_HISTORY = [
+  { date: '2026-03-15', symbol: 'DOGE', qtySold: 500, avgCost: 0.08, exitPrice: 0.14, realizedPnl: 30.00, proceeds: 70.00, closeType: 'Full' }
+];
 let lastPriceUpdate = null;
 
 // ─── HIDE BALANCE TOGGLE ──────────────────────────────────────────────────────
@@ -107,6 +174,60 @@ function showAppShell() {
   document.getElementById('app-shell').style.display = 'flex';
 }
 
+function enterDemoMode() {
+  isDemoMode = true;
+  TRADES = buildDemoTrades();
+  HOLDINGS = buildDemoHoldings();
+  cashBalance = DEMO_CASH_BALANCE;
+  tradingBalance = parseFloat((DEMO_TRADING_STARTING_BALANCE +
+    TRADES.filter(t => t.status !== 'Open').reduce((s, t) => s + t.pnl, 0)).toFixed(2));
+  realizedHistory = DEMO_REALIZED_HISTORY;
+  profileName = DEMO_PROFILE_NAME;
+  profilePhoto = null;
+
+  const emailEl = document.getElementById('user-email');
+  if (emailEl) { emailEl.textContent = 'Demo Mode'; emailEl.style.display = 'block'; }
+  const banner = document.getElementById('demo-banner');
+  if (banner) banner.style.display = 'flex';
+  const signOutBtn = document.querySelector('[data-action="sign-out"]');
+  if (signOutBtn) signOutBtn.textContent = 'Sign In';
+
+  showAppShell();
+  loadProfile();
+  renderAll();
+}
+
+function goToAuthFromDemo() {
+  showAuthScreen();
+  const backBtn = document.getElementById('back-to-demo-btn');
+  if (backBtn) backBtn.style.display = 'block';
+}
+
+function backToDemo() {
+  showAppShell();
+}
+
+function exitDemoMode() {
+  if (!isDemoMode) return;
+  isDemoMode = false;
+  const banner = document.getElementById('demo-banner');
+  if (banner) banner.style.display = 'none';
+  const signOutBtn = document.querySelector('[data-action="sign-out"]');
+  if (signOutBtn) signOutBtn.textContent = 'Sign out';
+  const backBtn = document.getElementById('back-to-demo-btn');
+  if (backBtn) backBtn.style.display = 'none';
+}
+
+// Every write-triggering function calls this first. Returns true (and blocks
+// the caller via early return) only in demo mode — real accounts are never
+// affected by this check.
+function demoGuard() {
+  if (!isDemoMode) return false;
+  toast('This is demo data — sign in to save your own', 'err');
+  goToAuthFromDemo();
+  return true;
+}
+
 async function sbSignUp() {
   const email = document.getElementById('auth-email').value.trim();
   const pass  = document.getElementById('auth-pass').value;
@@ -162,6 +283,7 @@ async function sbSignIn() {
       return setAuthMsg(msg, 'red');
     }
     applySession(data);
+    exitDemoMode();
     document.getElementById('user-email').textContent = currentUser.email;
     showAppShell();
     loadProfile();
@@ -874,6 +996,7 @@ function openAddFundsModal(target) {
 }
 
 async function submitAddFunds() {
+  if (demoGuard()) return;
   const target = document.getElementById('af-target').value;
   const amount = parseFloat(document.getElementById('af-amount').value);
   if (!amount || amount <= 0) return toast('Enter an amount greater than 0', 'err');
@@ -939,6 +1062,7 @@ function openEditTrade(id) {
 
 // ─── SAVE TRADE (ADD + EDIT) ──────────────────────────────────────────────────
 async function saveTrade() {
+  if (demoGuard()) return;
   const editId = document.getElementById('t-edit-id').value;
   const entry = parseFloat(document.getElementById('t-entry').value);
   const exitVal = document.getElementById('t-exit').value;
@@ -1028,6 +1152,7 @@ function openCloseTrade(id) {
 }
 
 async function closeTradeSubmit() {
+  if (demoGuard()) return;
   const id = document.getElementById('ct-trade-id').value;
   const exit = parseFloat(document.getElementById('ct-exit').value);
   const date = document.getElementById('ct-date').value;
@@ -1346,6 +1471,7 @@ function openAddInvestment() {
 }
 
 async function saveInvestment() {
+  if (demoGuard()) return;
   const editId = document.getElementById('i-edit-id').value;
   const symbol = document.getElementById('i-symbol').value.trim().toUpperCase();
   const qty = parseFloat(document.getElementById('i-qty').value);
@@ -1425,6 +1551,7 @@ async function saveInvestment() {
 
 // ─── DELETE TRADE ─────────────────────────────────────────────────────────────
 async function deleteTrade(id) {
+  if (demoGuard()) return;
   const t = TRADES.find(t => t.id === id);
   const hasPnl = t && t.pnl;
   const confirmMsg = hasPnl
@@ -1449,6 +1576,7 @@ async function deleteTrade(id) {
 
 // ─── DELETE HOLDING ───────────────────────────────────────────────────────────
 async function deleteHolding(id) {
+  if (demoGuard()) return;
   if (!confirm('Remove this holding? Its cost basis will be refunded to your cash balance.')) return;
   try {
     const h = HOLDINGS.find(h => h.id === id);
@@ -1549,6 +1677,7 @@ async function saveUserSettings() {
 }
 
 async function clearRealizedHistory() {
+  if (demoGuard()) return;
   if (!confirm('Clear all realized P&L history and reset cash balance to $0?')) return;
   realizedHistory = [];
   cashBalance = 0;
@@ -1622,6 +1751,7 @@ function updateClosePnl() {
 
 // ─── SUBMIT CLOSE POSITION ────────────────────────────────────────────────────
 async function submitClosePosition() {
+  if (demoGuard()) return;
   const id = document.getElementById('cp-holding-id').value;
   const h = HOLDINGS.find(h => h.id === id);
   if (!h) return;
@@ -2423,6 +2553,7 @@ function handleProfilePhoto(input) {
 }
 
 async function saveProfile() {
+  if (demoGuard()) return;
   const name = document.getElementById('profile-name-input').value.trim();
   if (!name) return toast('Enter a display name', 'err');
 
@@ -2501,8 +2632,10 @@ document.addEventListener('click', (e) => {
   const a = t.dataset.action;
   switch (a) {
     case 'sign-in': sbSignIn(); break;
+    case 'show-auth-from-demo': goToAuthFromDemo(); break;
+    case 'back-to-demo': backToDemo(); break;
     case 'sign-up': sbSignUp(); break;
-    case 'sign-out': sbSignOut(); break;
+    case 'sign-out': isDemoMode ? goToAuthFromDemo() : sbSignOut(); break;
     case 'set-currency': setCurrency(t.dataset.currency, t); break;
     case 'show-page': showPage(t.dataset.page, t); break;
     case 'toggle-balance': toggleBalanceVisibility(); break;
@@ -2592,8 +2725,8 @@ applyBalanceVisibility();
   log.info('[INIT] now:', Date.now(), new Date().toLocaleString());
 
   if (!savedToken || !savedUser) {
-    log.info('[INIT] No saved session, showing auth screen');
-    showAuthScreen();
+    log.info('[INIT] No saved session, entering demo mode');
+    enterDemoMode();
     return;
   }
 

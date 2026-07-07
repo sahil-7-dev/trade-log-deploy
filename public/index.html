@@ -30,6 +30,7 @@
       <div id="auth-msg" style="font-size:11px;min-height:16px"></div>
       <button class="btn btn-primary" data-action="sign-in" style="width:100%;padding:10px">Sign In</button>
       <button class="btn btn-ghost" data-action="sign-up" style="width:100%;padding:10px">Create Account</button>
+      <button id="back-to-demo-btn" data-action="back-to-demo" style="display:none;background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:4px;text-align:center">← Back to demo</button>
     </div>
   </div>
 </div>
@@ -103,6 +104,10 @@
 
   <!-- MAIN -->
   <main class="main">
+    <div id="demo-banner" style="display:none;align-items:center;justify-content:space-between;gap:12px;background:var(--surface2);border-bottom:1px solid var(--border);padding:10px 24px;font-size:12px">
+      <span style="color:var(--muted)">🔍 You're viewing <strong style="color:var(--text)">demo data</strong> — nothing here is saved. Sign in to track your own trades.</span>
+      <button class="btn btn-primary" data-action="show-auth-from-demo" style="font-size:11px;padding:6px 14px;flex-shrink:0">Sign In</button>
+    </div>
     <div class="topbar">
       <div class="topbar-title" id="page-title">Dashboard</div>
       <div class="topbar-actions">
