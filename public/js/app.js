@@ -696,6 +696,15 @@ function computeStats(tradesOverride) {
   const invCost = HOLDINGS.reduce((s, h) => s + h.qty * h.buyPrice, 0);
   const invPnl = invTotal - invCost;
 
+  // Total portfolio value = holdings market value + idle cash. Cash itself
+  // has no unrealized gain/loss (it's already realized dollars), so it's
+  // added to both the value and the cost-basis side of the return % —
+  // otherwise a mostly-cash portfolio would misleadingly show the same
+  // return % as a fully-invested one with the same dollar gain.
+  const totalEquity = invTotal + cashBalance;
+  const totalEquityCost = invCost + cashBalance;
+  const totalEquityPct = totalEquityCost > 0 ? (invPnl / totalEquityCost * 100) : null;
+
   // Best holding
   const bestHolding = HOLDINGS.length ? HOLDINGS.reduce((a, b) => {
     const aRet = (a.curPrice - a.buyPrice) / a.buyPrice;
@@ -708,7 +717,8 @@ function computeStats(tradesOverride) {
     grossWin, grossLoss, profitFactor,
     bestTrade, worstTrade, bestStreak, worstStreak,
     wins, losses, open, closed, maxDrawdown: dd,
-    invTotal, invCost, invPnl, bestHolding
+    invTotal, invCost, invPnl, bestHolding,
+    totalEquity, totalEquityCost, totalEquityPct
   };
 }
 
@@ -779,7 +789,7 @@ function updateStatCards(s) {
   const tradingRetPct = s.closed.length && s.closed[0]?.size
     ? null // Can't easily compute initial capital, skip
     : null;
-  set('ov-equity', s.invTotal ? `<span class="balance-val">${fmtVal(s.invTotal)}</span>` : '—');
+  set('ov-equity', (HOLDINGS.length > 0 || cashBalance !== 0) ? `<span class="balance-val">${fmtVal(s.totalEquity)}</span>` : '—');
   set('ov-return', s.closed.length ? bv(fmt(s.totalPnl)) : '—');
   const retEl2 = document.getElementById('ov-return');
   if (retEl2) retEl2.className = 'stat-val ' + (s.totalPnl >= 0 ? 'green' : 'red');
@@ -789,10 +799,10 @@ function updateStatCards(s) {
   set('ov-meta', s.closed.length ? `${s.closed.length} closed trades` : 'No data');
 
   // Sidebar — show % return if we have portfolio data, else trading P&L
-  const sidebarPct = s.invCost > 0 ? (s.invPnl / s.invCost * 100).toFixed(1) : null;
-  set('sidebar-equity', bv(s.invTotal ? fmtVal(s.invTotal) : fmtVal(0)));
-  set('sidebar-change', sidebarPct
-    ? `${parseFloat(sidebarPct) >= 0 ? '+' : ''}${sidebarPct}% portfolio return`
+  const sidebarPct = s.totalEquityPct;
+  set('sidebar-equity', bv((HOLDINGS.length > 0 || cashBalance !== 0) ? fmtVal(s.totalEquity) : fmtVal(0)));
+  set('sidebar-change', sidebarPct != null
+    ? `${sidebarPct >= 0 ? '+' : ''}${sidebarPct.toFixed(1)}% portfolio return`
     : s.totalPnl !== 0 ? bv(fmt(s.totalPnl)) + ' trading' : 'No data');
 }
 
