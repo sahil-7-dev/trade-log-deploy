@@ -19,12 +19,14 @@ A single-page trading journal and portfolio tracker for crypto, forex, and stock
 **Trade Log**
 - Entry/exit price, size, SL/TP, R:R, setup tags, and free-text notes
 - Auto-computed P&L and win/loss status (generated columns in Postgres — never drifts from source data)
+- **R:R is "achieved," not "planned"** — computed from your actual exit vs. your stop-loss distance, not your take-profit target. A 3:1 setup you exit early at breakeven honestly shows `0.00R`, not `3.00R`
 - Filterable table (All / Open / Wins / Losses), CSV export
 - **Trading balance** that moves with realized P&L — closing a trade at +$1 nudges the balance up by $1, a −$0.50 loss nudges it down, automatically, with editing or deleting a trade correctly reversing its effect. Deposit additional funds anytime via "+ Add Funds"
 
 **Portfolio / Investing**
 - Buy/sell tracking with live crypto prices (CoinGecko)
 - **Cash balance** that automatically debits on buy, credits on sell, and adjusts correctly on edit or delete — so total equity (cash + holdings) always reconciles. Deposit funds directly anytime via "+ Deposit"
+- Cash balance shows up as its own row in the holdings list (and its own slice in the portfolio allocation chart) — a true picture of the portfolio instead of a disconnected number floating outside it
 - Full or partial position closing with realized P&L history
 - Cash balance, trading balance, and realized history all sync to Supabase (`user_settings` table), not just the browser — consistent across devices and sign-ins
 
@@ -32,11 +34,13 @@ Note the two balances track different things by design: **cash balance** is a bu
 
 **Analytics & Tools**
 - Equity curve, win/loss split, R:R distribution, win rate by asset
+- Monthly P&L heatmap, correctly scoped to a single year — hovering shows exact figures, small accounts get 2-decimal precision instead of rounding to an indistinguishable "$0"
+- **Yearly Recap** — pick any year from a dropdown (auto-populated from your actual trade history) and see win rate, total P&L, avg R:R achieved, expectancy, and best/worst trade for that year in isolation, reusing the exact same stats engine as the main dashboard so the numbers can't drift out of sync
 - P&L calendar with daily breakdown and a running daily log
 - Visual query builder with live SQL preview
 
 **Account**
-- Email/password auth via Supabase, with automatic token refresh (no re-login mid-session)
+- Email/password auth via Supabase, with automatic token refresh (no re-login mid-session) and clear error messages on failure — a bad request never just hangs on "Signing in…" with no feedback
 - Editable profile with a globally unique, case-insensitive display name — live "available / taken" check as you type, enforced by a database constraint (not just client-side validation)
 - USD / INR currency toggle, hide-balance privacy toggle
 

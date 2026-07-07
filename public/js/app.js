@@ -609,7 +609,7 @@ function showLoading(on) {
 }
 
 // ─── NAVIGATION ───────────────────────────────────────────────────────────────
-const PAGE_TITLES = { dashboard: 'Dashboard', trades: 'Trade Log', analytics: 'Analytics', investing: 'Portfolio', equity: 'Equity Curve', calendar: 'P&L Calendar', query: 'Query Builder', schema: 'DB Schema' };
+const PAGE_TITLES = { dashboard: 'Dashboard', trades: 'Trade Log', analytics: 'Analytics', investing: 'Portfolio', equity: 'Equity Curve', calendar: 'P&L Calendar', query: 'Query Builder', yearly: 'Yearly Recap', schema: 'DB Schema' };
 
 function showPage(id, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -621,6 +621,9 @@ function showPage(id, el) {
   if (id === 'calendar') {
     renderCalendar();
     renderDailyPnlLog();
+  }
+  if (id === 'yearly') {
+    renderYearlyRecap();
   }
 }
 
@@ -648,11 +651,12 @@ function renderAll() {
 }
 
 // ─── STATS COMPUTATION ────────────────────────────────────────────────────────
-function computeStats() {
-  const closed = TRADES.filter(t => t.status !== 'Open');
+function computeStats(tradesOverride) {
+  const src = tradesOverride || TRADES;
+  const closed = src.filter(t => t.status !== 'Open');
   const wins = closed.filter(t => t.status === 'Win');
   const losses = closed.filter(t => t.status === 'Loss');
-  const open = TRADES.filter(t => t.status === 'Open');
+  const open = src.filter(t => t.status === 'Open');
 
   const totalPnl = closed.reduce((s, t) => s + t.pnl, 0);
   const winRate = closed.length ? (wins.length / closed.length * 100).toFixed(1) : '0.0';
@@ -671,7 +675,7 @@ function computeStats() {
 
   // Streaks
   let bestStreak = 0, worstStreak = 0, cur = 0;
-  const statusSeq = [...TRADES].sort((a, b) => new Date(a.date) - new Date(b.date))
+  const statusSeq = [...src].sort((a, b) => new Date(a.date) - new Date(b.date))
     .filter(t => t.status !== 'Open').map(t => t.status);
   for (const s of statusSeq) {
     if (s === 'Win') { cur = cur >= 0 ? cur + 1 : 1; bestStreak = Math.max(bestStreak, cur); }
@@ -790,6 +794,58 @@ function updateStatCards(s) {
   set('sidebar-change', sidebarPct
     ? `${parseFloat(sidebarPct) >= 0 ? '+' : ''}${sidebarPct}% portfolio return`
     : s.totalPnl !== 0 ? bv(fmt(s.totalPnl)) + ' trading' : 'No data');
+}
+
+// ─── YEARLY RECAP ─────────────────────────────────────────────────────────────
+let selectedRecapYear = null;
+
+function getAvailableYears() {
+  const years = new Set(TRADES.map(t => parseInt(t.date.split('-')[0], 10)));
+  years.add(new Date().getFullYear()); // always offer the current year, even with no trades logged yet
+  return [...years].sort((a, b) => b - a);
+}
+
+function renderYearlyRecap() {
+  const years = getAvailableYears();
+  if (selectedRecapYear === null || !years.includes(selectedRecapYear)) {
+    selectedRecapYear = years[0];
+  }
+
+  const sel = document.getElementById('yr-year-select');
+  if (sel) {
+    sel.innerHTML = years.map(y => `<option value="${y}" ${y === selectedRecapYear ? 'selected' : ''}>${y}</option>`).join('');
+  }
+
+  const yearTrades = TRADES.filter(t => parseInt(t.date.split('-')[0], 10) === selectedRecapYear);
+  const s = computeStats(yearTrades);
+
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.innerHTML = val; };
+  const setClass = (id, cls) => { const el = document.getElementById(id); if (el) el.className = 'stat-val ' + cls; };
+
+  set('yr-pnl', s.totalPnl !== 0 || s.closed.length ? bv(fmt(s.totalPnl)) : '—');
+  setClass('yr-pnl', s.totalPnl >= 0 ? 'green' : 'red');
+  set('yr-pnl-sub', s.closed.length ? `${s.winRate}% win rate` : 'No closed trades');
+
+  set('yr-winrate', s.closed.length ? s.winRate + '%' : '—');
+  set('yr-winrate-sub', s.closed.length ? `${s.wins.length}W / ${s.losses.length}L / ${s.open.length} Open` : '—');
+
+  set('yr-rr', s.avgRR != null ? s.avgRR.toFixed(2) + 'R' : '—');
+  set('yr-rr-sub', s.avgRR ? 'Avg achieved' : 'No RR data');
+
+  set('yr-expect', s.closed.length ? bv(fmt(s.expectancy)) : '—');
+  setClass('yr-expect', s.expectancy >= 0 ? 'green' : 'red');
+
+  set('yr-best', s.bestTrade ? bv(fmt(s.bestTrade.pnl)) : '—');
+  set('yr-best-sym', s.bestTrade ? s.bestTrade.symbol : '—');
+  set('yr-worst', s.worstTrade ? bv(fmt(s.worstTrade.pnl)) : '—');
+  set('yr-worst-sym', s.worstTrade ? s.worstTrade.symbol : '—');
+
+  renderHeatmapInto('yearly-heatmap', selectedRecapYear);
+}
+
+function onRecapYearChange(value) {
+  selectedRecapYear = parseInt(value, 10);
+  renderYearlyRecap();
 }
 
 // ─── MODAL ────────────────────────────────────────────────────────────────────
@@ -1700,11 +1756,31 @@ function renderTrades() {
 function renderHoldings() {
   const list = document.getElementById('holdings-list');
   if (!list) return;
+
+  // USD isn't a real `investments` row (no id, nothing to close/edit/delete) —
+  // it's the cash balance rendered as a holdings-list entry for a true picture
+  // of the portfolio. Always shown, even at $0, so "+ Deposit" is discoverable.
+  const usdRow = `<div class="holding-row">
+    <div class="holding-icon" style="background:#00D4AA22;color:#00D4AA">USD</div>
+    <div class="holding-info">
+      <div class="holding-name" style="display:flex;align-items:center;gap:4px">
+        US Dollar
+        <span style="font-size:10px;color:var(--muted);font-weight:400">Cash</span>
+      </div>
+      <div class="holding-qty">Available cash balance</div>
+    </div>
+    <div class="holding-vals">
+      <div class="holding-val"><span class="balance-val">$${cashBalance.toFixed(2)}</span></div>
+      <div class="holding-ret" style="color:var(--muted)">—</div>
+    </div>
+    <button class="btn btn-ghost" data-action="open-deposit-cash" style="font-size:10px;padding:3px 10px;margin-left:4px;text-transform:none;letter-spacing:normal">+ Deposit</button>
+  </div>`;
+
   if (HOLDINGS.length === 0) {
-    list.innerHTML = `<div style="text-align:center;padding:32px;color:var(--muted)">No holdings yet — click "+ Add Investment"</div>`;
+    list.innerHTML = usdRow + `<div style="text-align:center;padding:32px;color:var(--muted)">No holdings yet — click "+ Add Investment"</div>`;
     return;
   }
-  list.innerHTML = HOLDINGS.map(h => {
+  list.innerHTML = usdRow + HOLDINGS.map(h => {
     const cost = h.qty * h.buyPrice;
     const val = h.qty * h.curPrice;
     const pnl = val - cost;
@@ -1761,30 +1837,49 @@ function renderHoldings() {
 const MONTHLY_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // ─── HEATMAP ──────────────────────────────────────────────────────────────────
-function getMonthlyPnl() {
+function getMonthlyPnl(year) {
+  const y = year || new Date().getFullYear();
   const monthly = Array(12).fill(0);
   const hasData = Array(12).fill(false);
-  TRADES.filter(t => t.status !== 'Open').forEach(t => {
-    const m = parseInt(t.date.split('-')[1]) - 1; // local month, no UTC shift
+  TRADES.filter(t => t.status !== 'Open' && parseInt(t.date.split('-')[0], 10) === y).forEach(t => {
+    const m = parseInt(t.date.split('-')[1], 10) - 1; // local month, no UTC shift
     monthly[m] += t.pnl;
     hasData[m] = true;
   });
   return monthly.map((v, i) => hasData[i] ? v : null);
 }
 
-function renderHeatmap() {
-  const grid = document.getElementById('heatmap');
+// Adaptive precision so small accounts (cents-level P&L) don't get rounded to
+// an indistinguishable "0" — and explicitly signs the value so a small loss
+// like -0.02 never collapses into JS's "-0 stringifies as 0" quirk.
+function fmtHeatmapVal(v) {
+  const abs = Math.abs(v);
+  const sign = v > 0 ? '+' : v < 0 ? '-' : '';
+  if (abs === 0) return '0';
+  if (abs >= 1000) return sign + (Math.round(abs / 100) / 10) + 'k';
+  if (abs < 10) return sign + abs.toFixed(2);
+  return sign + Math.round(abs);
+}
+
+function renderHeatmapInto(gridId, year) {
+  const grid = document.getElementById(gridId);
   if (!grid) return;
-  const pnlData = getMonthlyPnl();
+  const pnlData = getMonthlyPnl(year);
   const maxAbs = Math.max(...pnlData.filter(v => v !== null).map(v => Math.abs(v)), 1);
   grid.innerHTML = pnlData.map((v, i) => {
-    if (v === null) return `<div class="heatmap-cell" style="background:var(--faint);color:var(--muted)" title="${MONTHLY_LABELS[i]}: No data">–</div>`;
+    if (v === null) return `<div class="heatmap-cell" style="background:var(--faint);color:var(--muted)" title="${MONTHLY_LABELS[i]} ${year}: No data">–</div>`;
     const intensity = Math.min(Math.abs(v) / maxAbs, 1);
-    const bg = v > 0 ? `rgba(0,212,170,${0.15 + intensity * 0.65})` : `rgba(255,77,109,${0.15 + intensity * 0.65})`;
-    const col = v > 0 ? '#00D4AA' : '#FF4D6D';
-    const disp = Math.abs(v) >= 1000 ? (v > 0 ? '+' : '') + Math.round(v / 100) / 10 + 'k' : (v > 0 ? '+' : '') + Math.round(v);
-    return `<div class="heatmap-cell" style="background:${bg};color:${col}" title="${MONTHLY_LABELS[i]}: ${v > 0 ? '+' : ''}$${v.toFixed(0)}">${disp}</div>`;
+    const bg = v > 0 ? `rgba(0,212,170,${0.15 + intensity * 0.65})` : v < 0 ? `rgba(255,77,109,${0.15 + intensity * 0.65})` : 'var(--faint)';
+    const col = v > 0 ? '#00D4AA' : v < 0 ? '#FF4D6D' : 'var(--muted)';
+    return `<div class="heatmap-cell" style="background:${bg};color:${col}" title="${MONTHLY_LABELS[i]} ${year}: ${v > 0 ? '+' : v < 0 ? '-' : ''}$${Math.abs(v).toFixed(2)}">${fmtHeatmapVal(v)}</div>`;
   }).join('');
+}
+
+function renderHeatmap() {
+  const y = new Date().getFullYear();
+  const label = document.getElementById('heatmap-year-label');
+  if (label) label.textContent = '— ' + y;
+  renderHeatmapInto('heatmap', y);
 }
 
 // ─── CHARTS ───────────────────────────────────────────────────────────────────
@@ -1889,14 +1984,21 @@ function initCharts(stats) {
     { scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, max: 100, ticks: { ...chartDefaults.scales.y.ticks, callback: (v) => v + '%' } } } }
   );
 
-  // Portfolio allocation
-  if (HOLDINGS.length > 0) {
-    const allocVals = HOLDINGS.map(h => h.qty * h.curPrice);
+  // Portfolio allocation (cash counts as its own slice, same as a holding)
+  if (HOLDINGS.length > 0 || cashBalance > 0) {
+    const allocLabels = HOLDINGS.map(h => h.symbol);
+    const allocVals   = HOLDINGS.map(h => h.qty * h.curPrice);
+    const allocColors = HOLDINGS.map(h => h.color + 'CC');
+    if (cashBalance > 0) {
+      allocLabels.push('USD');
+      allocVals.push(cashBalance);
+      allocColors.push('#00D4AACC');
+    }
     const allocCtx = document.getElementById('allocChart');
     if (allocCtx) {
       chartInstances.alloc = new Chart(allocCtx, {
         type: 'doughnut',
-        data: { labels: HOLDINGS.map(h => h.symbol), datasets: [{ data: allocVals, backgroundColor: HOLDINGS.map(h => h.color + 'CC'), borderWidth: 0, hoverOffset: 6 }] },
+        data: { labels: allocLabels, datasets: [{ data: allocVals, backgroundColor: allocColors, borderWidth: 0, hoverOffset: 6 }] },
         options: {
           responsive: true, maintainAspectRatio: false, cutout: '60%',
           plugins: {
@@ -1906,6 +2008,9 @@ function initCharts(stats) {
         }
       });
     }
+  }
+  // Per-asset return % — cash has no "return", so this stays holdings-only
+  if (HOLDINGS.length > 0) {
     const holdRets = HOLDINGS.map(h => parseFloat(((h.curPrice - h.buyPrice) / h.buyPrice * 100).toFixed(1)));
     chartInstances.holdRet = mkChart('holdingRetChart', 'bar', HOLDINGS.map(h => h.symbol),
       [{ data: holdRets, backgroundColor: holdRets.map(v => v >= 0 ? 'rgba(0,212,170,0.75)' : 'rgba(255,77,109,0.75)'), borderRadius: 4 }],
@@ -2432,6 +2537,7 @@ document.addEventListener('change', (e) => {
   const t = e.target;
   if (t.id === 'profile-photo-input') return handleProfilePhoto(t);
   if (t.id === 'cp-type') return onCloseTypeChange();
+  if (t.id === 'yr-year-select') return onRecapYearChange(t.value);
   if (t.dataset && t.dataset.action === 'update-cond') {
     return updateCond(parseInt(t.dataset.condId, 10), t.dataset.condField, t.value);
   }

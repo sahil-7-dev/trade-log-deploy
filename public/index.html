@@ -75,6 +75,9 @@
       <div class="nav-item" data-action="show-page" data-page="query">
         <span class="icon">⌖</span> Query Builder
       </div>
+      <div class="nav-item" data-action="show-page" data-page="yearly">
+        <span class="icon">◫</span> Yearly Recap
+      </div>
     </nav>
 
     <div class="sidebar-footer">
@@ -170,7 +173,7 @@
         <!-- Monthly Heatmap -->
         <div class="chart-card">
           <div class="chart-header">
-            <div class="chart-title">Monthly P&L Heatmap</div>
+            <div class="chart-title">Monthly P&L Heatmap <span id="heatmap-year-label" style="color:var(--muted);font-weight:400"></span></div>
             <div class="chart-meta">Hover for details</div>
           </div>
           <div class="hm-months">
@@ -580,6 +583,63 @@
             </thead>
             <tbody id="query-results-body"></tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- YEARLY RECAP PAGE -->
+      <div class="page" id="page-yearly">
+        <div class="chart-card" style="margin-bottom:14px">
+          <div class="chart-header">
+            <div class="chart-title">Year in Review</div>
+            <select class="form-select" id="yr-year-select" style="width:120px;font-size:11px"></select>
+          </div>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-label">Total P&L</div>
+            <div class="stat-val green" id="yr-pnl">—</div>
+            <div class="stat-sub" id="yr-pnl-sub">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Win Rate</div>
+            <div class="stat-val green" id="yr-winrate">—</div>
+            <div class="stat-sub" id="yr-winrate-sub">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Avg RR Achieved</div>
+            <div class="stat-val blue" id="yr-rr">—</div>
+            <div class="stat-sub" id="yr-rr-sub">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Expectancy</div>
+            <div class="stat-val" id="yr-expect">—</div>
+            <div class="stat-sub">Per trade avg</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Best Trade</div>
+            <div class="stat-val green" id="yr-best">—</div>
+            <div class="stat-sub" id="yr-best-sym">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Worst Trade</div>
+            <div class="stat-val red" id="yr-worst">—</div>
+            <div class="stat-sub" id="yr-worst-sym">—</div>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">Monthly P&L Heatmap</div>
+            <div class="chart-meta" id="yr-heatmap-meta">Hover for details</div>
+          </div>
+          <div class="hm-months">
+            <div class="hm-month">JAN</div><div class="hm-month">FEB</div><div class="hm-month">MAR</div>
+            <div class="hm-month">APR</div><div class="hm-month">MAY</div><div class="hm-month">JUN</div>
+            <div class="hm-month">JUL</div><div class="hm-month">AUG</div><div class="hm-month">SEP</div>
+            <div class="hm-month">OCT</div><div class="hm-month">NOV</div><div class="hm-month">DEC</div>
+          </div>
+          <div class="heatmap-grid" id="yearly-heatmap"></div>
         </div>
       </div>
 
