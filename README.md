@@ -2,8 +2,16 @@
 
 A single-page trading journal and portfolio tracker for crypto, forex, and stock trades — built on Supabase (auth + Postgres + Row Level Security) with live crypto pricing via CoinGecko. No framework, no build tooling beyond a small config-generation step, deployable to Vercel in minutes.
 
+The [live deployment](https://trade-log-deploy.vercel.app) drops you straight into a fully-populated demo — no signup wall, no empty states.
+
+## Screenshots
+
+![Trade Log Dashboard](./screenshots/trade-log-dashboard.png)
+![Investment Dashboard](./screenshots/investment-dashboard.png)
+
 ## Table of Contents
 
+- [Screenshots](#screenshots)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Architecture](#architecture)
@@ -15,6 +23,11 @@ A single-page trading journal and portfolio tracker for crypto, forex, and stock
 - [License](#license)
 
 ## Features
+
+**Demo Mode**
+- Anyone landing on the app with no saved session gets a fully-populated demo instead of a bare sign-in wall — 18 fixed sample trades spanning Crypto/Forex/Stocks (62.5% win rate, mixed wins/losses/open positions), 5 sample holdings, cash and trading balances, all computed with the exact same P&L/R:R formulas the real app uses, not hand-typed numbers
+- Every read works normally — open any modal, browse every page, poke at the analytics — but every write (save, delete, deposit, close a position) is caught by a single `demoGuard()` check that surfaces a clear "sign in to save your own" prompt instead of silently failing or doing nothing
+- Signing in or creating an account cleanly replaces the demo state with real data loaded from Supabase; a "← Back to demo" link lets someone back out of the sign-in screen without losing their place
 
 **Trade Log**
 - Entry/exit price, size, SL/TP, R:R, setup tags, and free-text notes
@@ -60,6 +73,8 @@ Note the two balances track different things by design: **cash balance** is a bu
 
 **Security enforced at the database, not just the client.** Every table has Row Level Security scoped to `auth.uid()`. The display-name uniqueness check is a `SECURITY DEFINER` Postgres function that returns only `true`/`false` — the client never gets read access to any other user's row, and the actual uniqueness guarantee comes from a database constraint, not client-side validation.
 
+**Demo mode is entirely client-side.** The fixed demo dataset lives in a JS constant, built once at load time using the same P&L/status/R:R formulas as the real trade lifecycle — it never touches Supabase, so anonymous visitors can't generate load or cost against the database. Every mutating function checks a single `demoGuard()` gate before doing anything, so adding a new write path can't accidentally bypass it by forgetting a separate check somewhere else.
+
 ## Project Structure
 
 ```
@@ -78,6 +93,7 @@ tradelog/
 │   └── schema.sql           # Full Supabase schema: tables, indexes, RLS policies, RPC function
 ├── docs/
 │   └── SETUP.md             # Step-by-step setup + troubleshooting guide
+├── screenshots/             # README images
 ├── package.json
 ├── vercel.json               # Build command, output dir, security headers (CSP, HSTS, etc.)
 ├── .gitignore
