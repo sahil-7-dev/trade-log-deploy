@@ -747,6 +747,17 @@ function showPage(id, el) {
   if (id === 'yearly') {
     renderYearlyRecap();
   }
+  closeSidebar(); // no-op on desktop; closes the mobile drawer after navigating
+}
+
+function toggleSidebar() {
+  document.querySelector('.sidebar').classList.toggle('mobile-open');
+  document.querySelector('.sidebar-backdrop').classList.toggle('open');
+}
+
+function closeSidebar() {
+  document.querySelector('.sidebar').classList.remove('mobile-open');
+  document.querySelector('.sidebar-backdrop').classList.remove('open');
 }
 
 // ─── CURRENCY ─────────────────────────────────────────────────────────────────
@@ -2631,6 +2642,7 @@ document.addEventListener('click', (e) => {
   if (!t) return;
   const a = t.dataset.action;
   switch (a) {
+    case 'toggle-sidebar': toggleSidebar(); break;
     case 'sign-in': sbSignIn(); break;
     case 'show-auth-from-demo': goToAuthFromDemo(); break;
     case 'back-to-demo': backToDemo(); break;
