@@ -89,12 +89,19 @@ tradelog/
 │       ├── config.js        # Generated at build time — gitignored, never committed
 │       ├── config.example.js
 │       └── app.js           # All application logic (auth, data, rendering, event delegation)
+├── api/                     # Vercel serverless functions (server-only, never shipped to the browser)
+│   ├── _bybit-shared.js     # Shared Bybit sync logic (underscore = not its own route, see file header)
+│   ├── bybit-sync.js        # Manual sync — user session auth, respects RLS
+│   └── bybit-cron.js        # Automated sync — service_role auth, see docs/BYBIT_INTEGRATION.md
+├── .github/workflows/
+│   └── bybit-sync.yml       # Free scheduled trigger for bybit-cron.js (alternative to paid Vercel cron)
 ├── scripts/
 │   └── build.js             # Generates config.js from env vars; runs automatically on Vercel
 ├── sql/
 │   └── schema.sql           # Full Supabase schema: tables, indexes, RLS policies, RPC function
 ├── docs/
-│   └── SETUP.md             # Step-by-step setup + troubleshooting guide
+│   ├── SETUP.md             # Step-by-step setup + troubleshooting guide
+│   └── BYBIT_INTEGRATION.md # Bybit auto-sync architecture, setup, and security tradeoffs
 ├── screenshots/             # README images
 ├── package.json
 ├── vercel.json               # Build command, output dir, security headers (CSP, HSTS, etc.)
@@ -153,7 +160,13 @@ All four tables have Row Level Security enabled, scoped to `auth.uid() = user_id
 
 ## Integrations
 
-**Bybit derivatives auto-sync** — documented, opt-in, not enabled on the live demo. Every closed Bybit derivatives trade can be pulled in automatically instead of logged by hand, via a Vercel serverless function that keeps your API secret server-side only. Covers the full architecture, exact R:R/breakeven rules applied to synced trades, and — importantly — an honest writeup of what it would take to go from "manual sync button" to "fully automated cron job" (a service-role Supabase key, which is a meaningfully bigger security surface, documented but deliberately not shipped as default-on code). Full guide: **[docs/BYBIT_INTEGRATION.md](docs/BYBIT_INTEGRATION.md)**.
+**Bybit derivatives auto-sync** — documented, opt-in, not enabled on the live demo. Every Bybit derivatives position — opened, still open, or closed — can flow into the Trade Log automatically instead of being logged by hand.
+
+Two implementations ship in this repo, both as Vercel serverless functions so the API secret never reaches the browser:
+- **Manual button** (`api/bybit-sync.js`) — authenticates as your own session, respects Row Level Security like every other request.
+- **Fully automated, no button click** (`api/bybit-cron.js`) — needs a Supabase `service_role` key, which bypasses RLS entirely; documented with that tradeoff stated plainly rather than glossed over, plus a free GitHub Actions workflow (`.github/workflows/bybit-sync.yml`) for frequent polling without needing Vercel's paid per-minute cron tier.
+
+Both share one matching engine (`api/_bybit-shared.js`) that correctly updates an "Open" trade into a "Closed" one in place rather than creating a duplicate row when a position closes. Full guide, including known edge cases and the "why not real-time WebSocket push" tradeoff: **[docs/BYBIT_INTEGRATION.md](docs/BYBIT_INTEGRATION.md)**.
 
 ## Security
 

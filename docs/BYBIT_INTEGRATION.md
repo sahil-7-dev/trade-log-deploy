@@ -1,22 +1,40 @@
 # Bybit Derivatives Auto-Sync
 
-Automatically journal every closed Bybit derivatives trade into TradeLog — no manual entry. This doc covers the architecture, exact rules applied, setup steps, and the security model. The working code lives at `api/bybit-sync.js` (a Vercel serverless function) and `sql/schema.sql` (already updated with the columns this needs).
+Automatically journal every Bybit derivatives position — opened, still open, or closed — into TradeLog. Covers both ways to run it (manual button vs. fully automated), the exact rules applied, setup, and the security model. Working code: `api/_bybit-shared.js`, `api/bybit-sync.js`, `api/bybit-cron.js`, `sql/schema.sql`.
 
-## Why this can't be a client-side feature
+## Two ways to run this
 
-Your Bybit API secret must never reach the browser. Anyone who can view your page's source, inspect network requests, or use dev tools can read anything sitting in client-side JavaScript — no amount of obfuscation changes that. The only safe place for the secret is a server that the browser talks to over HTTPS but never sees the internals of.
+| | Manual button | Automated (no button) |
+|---|---|---|
+| **File** | `api/bybit-sync.js` | `api/bybit-cron.js` |
+| **Auth** | Your own session token | Supabase `service_role` key |
+| **Respects RLS?** | Yes — same as every other request | No — bypasses RLS entirely |
+| **Trigger** | You click "Sync Bybit" | A scheduler hits the endpoint on a timer |
+| **Setup effort** | Just env vars | Env vars + a scheduler (see below) |
 
-That's what `api/bybit-sync.js` is: a **Vercel serverless function**. It runs on Vercel's infrastructure, reads `BYBIT_API_KEY`/`BYBIT_API_SECRET` from environment variables (same mechanism as `SUPABASE_URL` etc. — see `scripts/build.js`), and only ever sends the browser a JSON summary (`{ imported: 12 }`), never the credentials themselves.
+Start with the manual button — it's simpler and lower-privilege. Move to automated only once you're comfortable with what a service-role key means (see the security section).
+
+## Why this can't be client-side
+
+Your Bybit API secret must never reach the browser — anyone who can view page source or inspect network requests can read anything sitting in client-side JS, no matter how it's disguised. Both sync paths run as **Vercel serverless functions**: server-only code that reads `BYBIT_API_KEY`/`BYBIT_API_SECRET` from environment variables and only ever sends the browser a JSON summary like `{ imported: 3, updated: 1 }`.
 
 ## Architecture
 
 ```
-┌──────────┐   click "Sync Bybit"   ┌────────────────────┐   HMAC-signed    ┌───────┐
-│  Browser │ ─────────────────────► │ /api/bybit-sync.js │ ───────────────► │ Bybit │
-│ (app.js) │                        │  (Vercel function)  │ ◄─────────────── │  API  │
-└──────────┘ ◄───── { imported: N } └──────────┬──────────┘  closed trades  └───────┘
+┌──────────┐  click "Sync Bybit"   ┌──────────────────┐   HMAC-signed    ┌───────┐
+│  Browser │ ────────────────────► │ bybit-sync.js    │ ───────────────► │ Bybit │
+└──────────┘ ◄── { imported, updated } └───────┬────────┘ ◄────────────── └───────┘
                                                 │
-                                     upsert (on_conflict=user_id,external_id)
+                          scheduler (cron / GH Actions)
+                                                │
+                                     ┌──────────▼──────────┐
+                                     │   bybit-cron.js     │──► Bybit (same as above)
+                                     │ (service_role key)  │
+                                     └──────────┬───────────┘
+                                                │
+                              both paths share: _bybit-shared.js
+                                     (open+close matching logic)
+                                                │
                                                 ▼
                                           ┌───────────┐
                                           │ Supabase  │
@@ -24,103 +42,120 @@ That's what `api/bybit-sync.js` is: a **Vercel serverless function**. It runs on
                                           └───────────┘
 ```
 
-The browser never talks to Bybit directly. It calls your own `/api/bybit-sync` endpoint (passing the user's existing Supabase session token, exactly like every other authenticated request this app already makes), and that endpoint does the Bybit call + Supabase upsert server-side.
+Both entry points call the exact same `syncBybitPositions()` function in `api/_bybit-shared.js` — there's one copy of the actual matching logic, not two slightly-different implementations to keep in sync.
+
+## What actually happens on each sync
+
+1. **Fetch recently closed positions** from Bybit (`/v5/position/closed-pnl`). For each one, check whether an "Open" row already exists for that position — if so, **update it in place** (fill in exit price, close date, switch it to a permanent closed-record ID). If not, insert it as a complete already-closed trade.
+2. **Fetch currently open positions** (`/v5/position/list`). For each one not already tracked, insert a new trade row with `exit: null` — which the existing schema already renders as `status = 'Open'`, no changes needed there.
+
+This means opening a position gets it into the Trade Log (as Open) on the *next* sync after you open it, and closing it updates that same row (rather than creating a duplicate) on the next sync after you close it. "Next sync" is either whenever you click the button, or however often your automation runs — see below for what "automatic" actually costs to make frequent.
+
+### The matching problem, and how it's solved
+
+Bybit doesn't give a position one stable ID across its whole lifetime the way a single order does. To match an open row to its later close, each currently-open position gets a deterministic key: `bybit-open:{symbol}:{side}:{positionIdx}`. When that same symbol+side later shows up in the closed-positions feed, the matching open row (if any) gets updated and its key permanently swapped to `bybit-closed:{orderId}` — so it can never be matched or touched again by the open-position step.
+
+**Known edge cases this doesn't specially handle:**
+- **Partial closes** (reducing size without fully closing) aren't tracked as separate events — the Open row just sits at its original entry size until the position is *fully* closed, at which point it updates once with the final numbers. Intermediate partial-close P&L isn't captured as its own line.
+- **Hedge mode** (simultaneous long+short on the same symbol) is disambiguated via `positionIdx`, which Bybit assigns per side in hedge mode — should work correctly, but I haven't been able to test this against a real hedge-mode account.
+- **A position closing and a new one opening on the same symbol+side between two poll cycles** could theoretically race — the close-matching step runs before the open-scanning step specifically to reduce this, but with infrequent polling (e.g. once a day) it's more likely to matter than with frequent polling.
 
 ## The rules, exactly as specified
 
-- **A trade closed without a matching SL/TP gets `sl = tp = null`.** This isn't missing data — it means Postgres's `rr` (generated column) stays `null` for that trade too, because there's no risk defined to compute an R:R against. `pnl` and `status` are still computed normally. In short: no SL/TP → still logs the P&L, just with no R:R attached — matching exactly how a manually-logged trade with no stop-loss already behaves.
-- **Breakeven detection needs zero special-casing.** The schema already flags `status = 'Breakeven'` whenever `exit = entry` exactly (see the "Breakeven Trades" feature — same rule applies uniformly whether a trade was logged by hand or synced from Bybit).
-- **Breakeven P&L still rolls into total P&L / trading balance.** It's a display category for clarity, not an exclusion — `computeStats()` already sums it into `totalPnl` regardless of status.
+- **A trade closed without a matching SL/TP gets `sl = tp = null`.** Both sync paths always import with null SL/TP (see "Known limitation" below on why) — which means Postgres's generated `rr` column stays null too: no risk defined, no R:R computed. `pnl` and `status` are still computed normally, so it still "cuts or adds" to your P&L, just without an R:R figure.
+- **Breakeven detection needs zero special-casing.** The schema already flags `status = 'Breakeven'` whenever `exit = entry` exactly, regardless of whether the trade was logged by hand or synced.
+- **Breakeven P&L still rolls into total P&L / trading balance** — it's a display category, not an exclusion (see `computeStats()` in `app.js`).
 
-## Setup
+## Setup — manual button (do this first)
 
 ### 1. Create a read-only Bybit API key
-
-Bybit → API Management → Create New Key.
-
-- **Permissions: read-only.** Do not enable Trade, Withdraw, or Transfer permissions for this key — this integration only ever reads your closed position history, it never places or modifies orders. A read-only key means that even if it somehow leaked, nothing could be traded or withdrawn with it.
-- If your Bybit plan supports IP allowlisting, restrict the key to Vercel's outbound IP ranges. Not all Vercel plans expose static outbound IPs — check your plan before relying on this.
+Bybit → API Management → Create New Key. **Permissions: read-only.** Do not enable Trade/Withdraw/Transfer — this only ever reads closed-pnl and position-list data. IP-restrict to Vercel's outbound ranges if your plan exposes static IPs.
 
 ### 2. Run the schema migration
-
-Already included in the full `sql/schema.sql` if you're setting up fresh. If you have an existing `trades` table, run just this:
-
+Already in the full `sql/schema.sql` for fresh setups. For an existing `trades` table:
 ```sql
 alter table trades add column if not exists source text default 'manual';
 alter table trades add column if not exists external_id text;
 alter table trades add constraint uq_trades_external_id unique (user_id, external_id);
 ```
 
-The unique constraint is what makes syncing idempotent — running the sync twice never creates duplicate trades. It's a plain (non-partial) constraint deliberately: SQL treats every `NULL` as distinct from every other `NULL`, so your existing manually-logged trades (`external_id` always null) are completely unaffected by it.
-
-### 3. Add environment variables in Vercel
-
-Project → Settings → Environment Variables:
-
+### 3. Add Vercel env vars
 ```
 BYBIT_API_KEY
 BYBIT_API_SECRET
 ```
+Redeploy after adding them.
 
-Same place `SUPABASE_URL` and friends already live. Redeploy after adding them.
-
-### 4. Wire up the frontend button
-
-Add a button anywhere sensible (Trade Log page topbar is a natural spot) and a small handler in `app.js`:
-
+### 4. Wire the button
 ```html
 <button class="btn btn-ghost" data-action="sync-bybit" style="font-size:11px">⟳ Sync Bybit</button>
 ```
-
 ```js
 async function syncBybit() {
   const btn = document.querySelector('[data-action="sync-bybit"]');
   if (btn) { btn.textContent = 'Syncing…'; btn.disabled = true; }
   try {
-    const res = await fetch('/api/bybit-sync', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${userToken}` }
-    });
+    const token = userToken || localStorage.getItem('sb_token') || '';
+    const res = await fetch('/api/bybit-sync', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Sync failed');
-    toast(`Synced ✓ ${data.imported} trade${data.imported === 1 ? '' : 's'} imported`);
-    await loadAllData(); // pulls the newly-imported trades into TRADES
-  } catch (e) {
-    toast(e.message, 'err');
-  }
+    toast(`Synced ✓ ${data.imported} imported, ${data.updated} updated`);
+    await loadAllData();
+  } catch (e) { toast(e.message, 'err'); }
   if (btn) { btn.textContent = '⟳ Sync Bybit'; btn.disabled = false; }
 }
 ```
+`case 'sync-bybit': syncBybit(); break;` in the click dispatcher, same pattern as every other button.
 
-Add `case 'sync-bybit': syncBybit(); break;` to the click dispatcher in `app.js`, same pattern as every other button in the app.
+Test it: click the button, then check Supabase → Table Editor → `trades` filtered to `source = eq.bybit`. Re-clicking with nothing new on Bybit should report `imported: 0, updated: 0` — that's the idempotency working, not a failure.
 
-This gives you a manual "Sync Bybit" button — click it, it pulls everything closed since your last sync. That's the safer, simpler design, and what `api/bybit-sync.js` implements as-is.
+## Setup — full automation (optional, higher privilege)
 
-## Going further: true "fully automated, no button" sync
+This is what makes it truly automatic (open a position on Bybit → it shows up without touching anything). It requires a **Supabase `service_role` key**, which is meaningfully more dangerous than what the rest of this app uses:
 
-The manual button above is deliberately the default here, and worth understanding *why* before reaching for full automation:
+> The `service_role` key bypasses Row Level Security **completely** — for every table, every user, not just yours. It is the single highest-privilege credential this app could possibly hold. Treat it like a root password: Vercel env var only, never logged, never in any client-reachable code path.
 
-`api/bybit-sync.js` authenticates the request using **the logged-in user's own Supabase session token** — the same one already sitting in `localStorage` after sign-in. That's what lets it write to `trades` while still respecting Row Level Security normally (it can only ever write rows for whoever's token it was given).
+That's why `api/bybit-cron.js` is a separate file from the manual button, hardcoded to one target user rather than looping over "all users" — this integration is designed for one person syncing their own account, not a general "everyone connects their own exchange" feature (that would need per-user encrypted credential storage, a substantially bigger feature than this).
 
-A Vercel Cron Job, by contrast, isn't triggered by a logged-in user — Vercel just hits your endpoint on a schedule with no session attached. To make that work, the endpoint would need to bypass RLS using Supabase's **`service_role` key** instead of a user token, and write to a specific, hardcoded `user_id` (since there's no session to derive one from).
+### 1. Add these Vercel env vars
+```
+SUPABASE_SERVICE_ROLE_KEY   — Supabase → Settings → API → service_role (NOT anon)
+TRADELOG_SYNC_USER_ID       — your own Supabase auth user_id (Table Editor → auth.users)
+CRON_SECRET                 — any random string you generate yourself
+```
 
-That's a meaningfully bigger security surface: a service role key has **unrestricted** read/write across every table for every user, with RLS completely bypassed. It's the kind of credential that, if it ever leaked, exposes everyone's data — not just yours. If you want this:
+`CRON_SECRET` is what stops a stranger from finding `/api/bybit-cron`'s URL and triggering syncs — the handler rejects any request that doesn't send `Authorization: Bearer <CRON_SECRET>` exactly.
 
-1. Add `SUPABASE_SERVICE_ROLE_KEY` and `TRADELOG_SYNC_USER_ID` as Vercel env vars (never the same key as `SUPABASE_ANON_KEY` — grab the actual `service_role` key from Supabase's API settings).
-2. Create a second endpoint (e.g. `api/bybit-cron.js`) that mirrors `bybit-sync.js` but uses the service role key in the `apikey`/`Authorization` headers instead of a user token, and hardcodes `user_id: process.env.TRADELOG_SYNC_USER_ID` in the mapped rows instead of deriving it from a session.
-3. Add a `crons` block to `vercel.json`:
-   ```json
-   "crons": [{ "path": "/api/bybit-cron", "schedule": "0 */6 * * *" }]
-   ```
-   (every 6 hours — Bybit's closed-pnl data isn't real-time-critical, no need to poll aggressively)
-4. Protect `api/bybit-cron.js` from being called by anyone but Vercel's own cron trigger — check the `Authorization: Bearer <CRON_SECRET>` header Vercel sends automatically when `CRON_SECRET` is set as an env var ([Vercel's cron docs](https://vercel.com/docs/cron-jobs) cover this).
+### 2. Pick a scheduler — and know the real constraint before choosing
 
-This is intentionally left as a documented extension rather than shipped code — a service-role-key endpoint is the highest-privilege thing in this entire app, and it deserves to be added deliberately by whoever's going to own that credential, not pasted in as a default.
+**Vercel's built-in cron is plan-gated in a way that matters here:** the Hobby (free) plan only allows cron schedules that run **once per day**, and even that one run can fire anywhere within the scheduled hour, not at an exact time. Anything more frequent (`*/5 * * * *`, hourly, etc.) **fails at deploy time** on Hobby — not silently ignored, the whole deployment breaks. Per-minute schedules need Vercel Pro ($20/mo).
+
+That's exactly why this repo does **not** ship a `crons` block in `vercel.json` by default — adding one that's too frequent would break your next deploy if you're on Hobby, which is the likely case for a personal project.
+
+**Option A — Vercel Cron, once a day (free, works on Hobby):**
+```json
+"crons": [{ "path": "/api/bybit-cron", "schedule": "0 0 * * *" }]
+```
+Add this to `vercel.json` yourself if once-daily is enough for you.
+
+**Option B — Vercel Cron, frequent (needs Pro):**
+```json
+"crons": [{ "path": "/api/bybit-cron", "schedule": "*/5 * * * *" }]
+```
+Only add this if you've actually upgraded to Pro — otherwise this exact line is what breaks your deployment.
+
+**Option C — GitHub Actions, frequent, free (recommended default).** A ready-to-use workflow is already at `.github/workflows/bybit-sync.yml` — it's a normal HTTPS request to your `/api/bybit-cron` endpoint made from GitHub's infrastructure on a schedule, so Vercel's plan restrictions don't apply to it at all (Vercel doesn't care who calls its API routes, only its *own* built-in scheduler is plan-gated). Setup:
+1. GitHub repo → Settings → Secrets and variables → Actions → add `DEPLOY_URL` (your Vercel URL) and `CRON_SECRET` (same value as the Vercel env var).
+2. Done — it runs automatically once committed. GitHub Actions' schedule triggers are best-effort too (expect a few minutes of drift, not second-level precision), which is fine for this use case.
 
 ## Known limitation: P&L won't match Bybit's number exactly
 
-Bybit's `closedPnl` field includes trading fees and funding payments. This app computes `pnl` as a Postgres generated column from `entry`/`exit`/`size`/`dir` — the same formula every manually-logged trade uses — which doesn't account for fees, to stay consistent across the whole trade log. Expect small discrepancies (typically a few tenths of a percent) between what TradeLog shows and what Bybit's own P&L tab shows for the same trade. Bybit's fee-inclusive figure is preserved in the trade's `notes` field for reference, so it's never actually lost — just not what drives the dashboard numbers.
+Bybit's `closedPnl` includes trading fees and funding payments; TradeLog's `pnl` is a Postgres generated column computed from `entry`/`exit`/`size`/`dir` — the same formula every manually-logged trade uses, which doesn't account for fees, to stay consistent across the whole log. Expect small discrepancies (typically a few tenths of a percent). Bybit's fee-inclusive figure is preserved in the trade's `notes` field, so it isn't lost — just not what drives the dashboard numbers.
 
-## Known limitation: SL/TP aren't imported (yet)
+## Known limitation: SL/TP aren't imported
 
-Bybit's closed-position endpoint reports the realized trade, not the conditional stop/take-profit orders that may have been attached to it — those live in a separate part of Bybit's API (order history, filtered for conditional/trigger orders) and would need to be fetched separately and correlated by symbol + time window to reliably reconstruct what SL/TP was actually set. That correlation is non-trivial to get right (partial fills, order modifications mid-trade, etc.), so v1 intentionally leaves `sl`/`tp` null for every synced trade — which, per the rules above, is exactly the documented "no SL/TP set" behavior, not a bug.
+Bybit's position/closed-pnl data doesn't include the conditional stop/take-profit orders that may have been attached to a position — those live separately in order history and would need correlating by symbol + time window to reconstruct reliably (partial fills and order modifications make this genuinely fiddly to get right). Both sync paths leave `sl`/`tp` null for every synced trade, which — per the rules above — is exactly the documented "no SL/TP set" behavior, not missing functionality.
+
+## Want truly instant (sub-second) updates instead of polling?
+
+Everything above is **polling** — checking Bybit every N minutes, however small N is. Bybit also has a WebSocket API that pushes position/order updates the instant they happen, which would be genuinely instant rather than "checked recently." The reason this repo doesn't implement that: a WebSocket needs a connection that stays open continuously, and Vercel serverless functions are the opposite of that by design — they spin up per request and terminate immediately after responding. Real-time push would need actual always-on hosting (a small persistent Node process on something like Railway, Render, or Fly.io) — a genuine infrastructure change, not a config addition, and out of scope for what's built here.
