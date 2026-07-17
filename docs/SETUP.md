@@ -90,6 +90,10 @@ Live crypto prices work without a key on CoinGecko's free tier, but a Demo key g
 
 If you skip this, leave `COINGECKO_API_KEY` blank in `config.js`; live prices will simply not load for the Portfolio page, everything else still works.
 
+## 4. Bybit derivatives auto-sync (optional)
+
+Not required for basic setup — this is a separate, opt-in feature for automatically importing closed Bybit derivatives trades instead of logging them by hand. It involves its own environment variables, a serverless function, and a couple of important security decisions (read-only API key scope, service-role key handling if you want full automation). Full walkthrough: **[docs/BYBIT_INTEGRATION.md](BYBIT_INTEGRATION.md)**.
+
 ## 4. Local configuration
 
 ```bash

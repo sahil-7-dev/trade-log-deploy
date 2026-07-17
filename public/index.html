@@ -264,6 +264,27 @@
             <div class="stat-sub">Consecutive losses</div>
           </div>
         </div>
+
+        <!-- Breakeven Trades — trades closed at exactly entry price. Counted
+             separately from Win/Loss since a scratch isn't a decision outcome,
+             but its P&L still rolls into total P&L / trading balance as normal. -->
+        <div class="table-card" id="breakeven-card" style="display:none">
+          <div class="table-header">
+            <div class="table-title">Breakeven Trades <span id="breakeven-summary" style="font-weight:400;color:var(--muted);font-size:11px"></span></div>
+          </div>
+          <div style="max-height:260px;overflow:auto">
+            <table>
+              <thead style="position:sticky;top:0;background:var(--surface);z-index:1">
+                <tr>
+                  <th>Date</th><th>Symbol</th><th>Type</th><th>Direction</th>
+                  <th>Entry</th><th>Exit</th><th>P&L</th>
+                </tr>
+              </thead>
+              <tbody id="breakeven-body"></tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="table-card">
           <div class="table-header">
             <div class="table-title">All Trades</div>
@@ -273,6 +294,7 @@
                 <button class="filter-btn" data-action="filter-all" data-filter="Open">Open</button>
                 <button class="filter-btn" data-action="filter-all" data-filter="Win">Wins</button>
                 <button class="filter-btn" data-action="filter-all" data-filter="Loss">Losses</button>
+                <button class="filter-btn" data-action="filter-all" data-filter="Breakeven">Breakeven</button>
               </div>
             </div>
           </div>

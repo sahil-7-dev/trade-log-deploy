@@ -18,6 +18,7 @@ The [live deployment](https://trade-log-deploy.vercel.app) drops you straight in
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
 - [Database Schema](#database-schema)
+- [Integrations](#integrations)
 - [Security](#security)
 - [Known Limitations](#known-limitations)
 - [License](#license)
@@ -32,6 +33,7 @@ The [live deployment](https://trade-log-deploy.vercel.app) drops you straight in
 **Trade Log**
 - Entry/exit price, size, SL/TP, R:R, setup tags, and free-text notes
 - Auto-computed P&L and win/loss status (generated columns in Postgres — never drifts from source data)
+- **Breakeven trades get their own category** — a trade closed at exactly entry price is `status = 'Breakeven'`, not lumped into Loss. Win rate is calculated only over decided trades (excludes breakeven from both sides of the ratio, since a scratch isn't a win/loss outcome), while total P&L and trading balance still count breakeven trades normally — it's a display distinction, not an exclusion
 - **R:R is "achieved," not "planned"** — computed from your actual exit vs. your stop-loss distance, not your take-profit target. A 3:1 setup you exit early at breakeven honestly shows `0.00R`, not `3.00R`
 - Filterable table (All / Open / Wins / Losses), CSV export
 - **Trading balance** that moves with realized P&L — closing a trade at +$1 nudges the balance up by $1, a −$0.50 loss nudges it down, automatically, with editing or deleting a trade correctly reversing its effect. Deposit additional funds anytime via "+ Add Funds"
@@ -148,6 +150,10 @@ Opens at `http://localhost:3000`. `config.js` is gitignored — it will never be
 | `profiles` | Display name | Case-insensitive **unique index** on `display_name` |
 
 All four tables have Row Level Security enabled, scoped to `auth.uid() = user_id`. Full definitions, indexes, and the `is_display_name_available()` RPC function are in `sql/schema.sql`.
+
+## Integrations
+
+**Bybit derivatives auto-sync** — documented, opt-in, not enabled on the live demo. Every closed Bybit derivatives trade can be pulled in automatically instead of logged by hand, via a Vercel serverless function that keeps your API secret server-side only. Covers the full architecture, exact R:R/breakeven rules applied to synced trades, and — importantly — an honest writeup of what it would take to go from "manual sync button" to "fully automated cron job" (a service-role Supabase key, which is a meaningfully bigger security surface, documented but deliberately not shipped as default-on code). Full guide: **[docs/BYBIT_INTEGRATION.md](docs/BYBIT_INTEGRATION.md)**.
 
 ## Security
 

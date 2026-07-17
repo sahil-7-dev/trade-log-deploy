@@ -772,6 +772,7 @@ function renderAll() {
   const stats = computeStats();
   updateStatCards(stats);
   renderTrades();
+  renderBreakevenTrades();
   renderHoldings();
   renderRealizedHistory();
   renderInvestingStats();
@@ -789,15 +790,27 @@ function computeStats(tradesOverride) {
   const closed = src.filter(t => t.status !== 'Open');
   const wins = closed.filter(t => t.status === 'Win');
   const losses = closed.filter(t => t.status === 'Loss');
+  const breakeven = closed.filter(t => t.status === 'Breakeven');
   const open = src.filter(t => t.status === 'Open');
 
   const totalPnl = closed.reduce((s, t) => s + t.pnl, 0);
-  const winRate = closed.length ? (wins.length / closed.length * 100).toFixed(1) : '0.0';
+  const breakevenPnl = breakeven.reduce((s, t) => s + t.pnl, 0);
+  // Win rate is "of the trades that were actually decided, how many did you
+  // win" — a breakeven/scratch trade isn't a decision outcome, so it's
+  // excluded from both sides of the ratio rather than diluting it as a loss.
+  const decided = wins.length + losses.length;
+  const winRate = decided ? (wins.length / decided * 100).toFixed(1) : '0.0';
   const rrVals = closed.filter(t => t.rr != null).map(t => t.rr);
   const avgRR = rrVals.length ? (rrVals.reduce((a, b) => a + b, 0) / rrVals.length) : null;
   const avgWin = wins.length ? wins.reduce((s, t) => s + t.pnl, 0) / wins.length : 0;
   const avgLoss = losses.length ? losses.reduce((s, t) => s + t.pnl, 0) / losses.length : 0;
-  const expectancy = closed.length ? (wins.length / closed.length) * avgWin + (losses.length / closed.length) * avgLoss : 0;
+  const avgBreakeven = breakeven.length ? breakevenPnl / breakeven.length : 0;
+  // Expectancy stays weighted over ALL closed trades (not just decided ones)
+  // since it's "average $ per trade taken," and a scratch is still a trade —
+  // its near-zero pnl just barely moves the number, which is correct.
+  const expectancy = closed.length
+    ? (wins.length / closed.length) * avgWin + (losses.length / closed.length) * avgLoss + (breakeven.length / closed.length) * avgBreakeven
+    : 0;
   const grossWin = wins.reduce((s, t) => s + t.pnl, 0);
   const grossLoss = Math.abs(losses.reduce((s, t) => s + t.pnl, 0));
   const profitFactor = grossLoss > 0 ? (grossWin / grossLoss) : null;
@@ -806,13 +819,15 @@ function computeStats(tradesOverride) {
   const bestTrade = sortedClosed[0] || null;
   const worstTrade = sortedClosed[sortedClosed.length - 1] || null;
 
-  // Streaks
+  // Streaks — a breakeven trade is neutral: it resets the current streak
+  // rather than extending or breaking either a win or loss run.
   let bestStreak = 0, worstStreak = 0, cur = 0;
   const statusSeq = [...src].sort((a, b) => new Date(a.date) - new Date(b.date))
     .filter(t => t.status !== 'Open').map(t => t.status);
   for (const s of statusSeq) {
     if (s === 'Win') { cur = cur >= 0 ? cur + 1 : 1; bestStreak = Math.max(bestStreak, cur); }
-    else { cur = cur <= 0 ? cur - 1 : -1; worstStreak = Math.min(worstStreak, cur); }
+    else if (s === 'Loss') { cur = cur <= 0 ? cur - 1 : -1; worstStreak = Math.min(worstStreak, cur); }
+    else { cur = 0; } // Breakeven
   }
 
   // Max drawdown
@@ -849,7 +864,7 @@ function computeStats(tradesOverride) {
     totalPnl, winRate, avgRR, avgWin, avgLoss, expectancy,
     grossWin, grossLoss, profitFactor,
     bestTrade, worstTrade, bestStreak, worstStreak,
-    wins, losses, open, closed, maxDrawdown: dd,
+    wins, losses, breakeven, breakevenPnl, open, closed, maxDrawdown: dd,
     invTotal, invCost, invPnl, bestHolding,
     totalEquity, totalEquityCost, totalEquityPct
   };
@@ -1442,7 +1457,7 @@ function calSelectDay(d) {
     <td class="mono">${t.exit != null ? t.exit.toLocaleString() : '—'}</td>
     <td class="mono ${t.pnl > 0 ? 'green' : t.pnl < 0 ? 'red' : ''}"><span class="balance-val">${fmt(t.pnl)}</span></td>
     <td class="mono">${t.rr != null ? t.rr.toFixed(2) + 'R' : '—'}</td>
-    <td><span class="badge ${t.status === 'Win' ? 'badge-win' : t.status === 'Loss' ? 'badge-loss' : 'badge-open'}">${t.status}</span></td>
+    <td><span class="badge ${t.status === 'Win' ? 'badge-win' : t.status === 'Loss' ? 'badge-loss' : t.status === 'Breakeven' ? 'badge-breakeven' : 'badge-open'}">${t.status}</span></td>
   </tr>`).join('');
   panel.style.display = 'block';
 }
@@ -1648,7 +1663,7 @@ function tradeRow(t, showNotes = false, showActions = false) {
     <td class="mono">${t.exit != null ? t.exit.toLocaleString() : '<span style="color:var(--amber)">Open</span>'}</td>
     <td class="mono ${pnl > 0 ? 'green' : pnl < 0 ? 'red' : ''}"><span class="balance-val">${safeStatus === 'Open' ? '—' : fmt(pnl)}</span></td>
     <td class="mono ${rr != null && rr > 0 ? 'green' : rr != null && rr < 0 ? 'red' : ''}">${rr != null ? rr.toFixed(2) + 'R' : '—'}</td>
-    <td><span class="badge ${safeStatus === 'Win' ? 'badge-win' : safeStatus === 'Loss' ? 'badge-loss' : 'badge-open'}">${safeStatus}</span></td>
+    <td><span class="badge ${safeStatus === 'Win' ? 'badge-win' : safeStatus === 'Loss' ? 'badge-loss' : safeStatus === 'Breakeven' ? 'badge-breakeven' : 'badge-open'}">${safeStatus}</span></td>
     ${showNotes ? `<td style="max-width:120px">${tagsHtml}</td>` : ''}
     ${showNotes ? `<td style="color:var(--muted);font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis">${safeNotes}</td>` : ''}
     ${showActions ? `<td style="white-space:nowrap">
@@ -1842,6 +1857,38 @@ function renderRealizedHistory() {
     <td class="mono ${r.realizedPnl >= 0 ? 'green' : 'red'}"><span class="balance-val">${r.realizedPnl >= 0 ? '+' : ''}$${r.realizedPnl.toFixed(2)}</span></td>
     <td class="mono"><span class="balance-val">$${r.proceeds.toFixed(2)}</span></td>
   </tr>`).join('');
+}
+
+function renderBreakevenTrades() {
+  const card = document.getElementById('breakeven-card');
+  const body = document.getElementById('breakeven-body');
+  const summary = document.getElementById('breakeven-summary');
+  if (!card || !body) return;
+
+  const breakevenTrades = TRADES.filter(t => t.status === 'Breakeven');
+  if (breakevenTrades.length === 0) {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = 'block';
+
+  const totalPnl = breakevenTrades.reduce((s, t) => s + t.pnl, 0);
+  if (summary) {
+    summary.textContent = `${breakevenTrades.length} trade${breakevenTrades.length === 1 ? '' : 's'} · ${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)} total — still counted in overall P&L`;
+  }
+
+  body.innerHTML = [...breakevenTrades].sort((a, b) => new Date(b.date) - new Date(a.date)).map(t => {
+    const safeSymbol = esc(t.symbol), safeType = esc(t.type), safeDir = esc(t.dir);
+    return `<tr>
+    <td class="mono" style="color:var(--muted)">${esc(t.date)}</td>
+    <td style="font-weight:600">${safeSymbol}</td>
+    <td class="col-type">${safeType}</td>
+    <td><span class="badge ${t.dir === 'Long' ? 'badge-long' : 'badge-short'}">${safeDir}</span></td>
+    <td class="mono">${t.entry}</td>
+    <td class="mono">${t.exit}</td>
+    <td class="mono" style="color:var(--muted)">$${t.pnl.toFixed(2)}</td>
+  </tr>`;
+  }).join('');
 }
 
 // ─── RENDER INVESTING STATS (cash/realized cards) ─────────────────────────────
@@ -2081,12 +2128,13 @@ function initCharts(stats) {
   // Win/Loss donut
   const wins = TRADES.filter(t => t.status === 'Win').length;
   const losses = TRADES.filter(t => t.status === 'Loss').length;
+  const breakevenC = TRADES.filter(t => t.status === 'Breakeven').length;
   const openC = TRADES.filter(t => t.status === 'Open').length;
   const wlCtx = document.getElementById('winLossChart');
   if (wlCtx) {
     chartInstances.winloss = new Chart(wlCtx, {
       type: 'doughnut',
-      data: { labels: ['Win', 'Loss', 'Open'], datasets: [{ data: [wins, losses, openC], backgroundColor: ['#00D4AA', '#FF4D6D', '#F5A623'], borderWidth: 0, hoverOffset: 6 }] },
+      data: { labels: ['Win', 'Loss', 'Breakeven', 'Open'], datasets: [{ data: [wins, losses, breakevenC, openC], backgroundColor: ['#00D4AA', '#FF4D6D', '#4A9EFF', '#F5A623'], borderWidth: 0, hoverOffset: 6 }] },
       options: {
         responsive: true, maintainAspectRatio: false, cutout: '70%',
         plugins: {
@@ -2203,7 +2251,7 @@ const FIELDS = [
   { key: 'rr',     label: 'RR Achieved',  type: 'number', ops: ['>', '<', '>=', '<=', '='] },
   { key: 'pnl',    label: 'P&L ($)',       type: 'number', ops: ['>', '<', '>=', '<=', '='] },
   { key: 'size',   label: 'Position Size', type: 'number', ops: ['>', '<', '>=', '<=', '='] },
-  { key: 'status', label: 'Status',        type: 'select', opts: ['Win', 'Loss', 'Open'], ops: ['=', '!='] },
+  { key: 'status', label: 'Status',        type: 'select', opts: ['Win', 'Loss', 'Breakeven', 'Open'], ops: ['=', '!='] },
   { key: 'type',   label: 'Asset Type',    type: 'select', opts: ['Crypto', 'Forex', 'Stocks'], ops: ['=', '!='] },
   { key: 'dir',    label: 'Direction',     type: 'select', opts: ['Long', 'Short'], ops: ['=', '!='] },
   { key: 'symbol', label: 'Symbol',        type: 'text',   ops: ['=', 'contains'] },
@@ -2348,7 +2396,7 @@ function runQuery() {
         <td class="mono">${t.exit != null ? t.exit.toLocaleString() : '<span style="color:var(--amber)">Open</span>'}</td>
         <td class="mono ${t.pnl > 0 ? 'green' : t.pnl < 0 ? 'red' : ''}"><span class="balance-val">${t.status === 'Open' ? '—' : fmt(t.pnl)}</span></td>
         <td class="mono ${t.rr != null && t.rr > 0 ? 'green' : t.rr != null && t.rr < 0 ? 'red' : ''}">${t.rr != null ? t.rr.toFixed(2) + 'R' : '—'}</td>
-        <td><span class="badge ${t.status === 'Win' ? 'badge-win' : t.status === 'Loss' ? 'badge-loss' : 'badge-open'}">${t.status}</span></td>
+        <td><span class="badge ${t.status === 'Win' ? 'badge-win' : t.status === 'Loss' ? 'badge-loss' : t.status === 'Breakeven' ? 'badge-breakeven' : 'badge-open'}">${t.status}</span></td>
       </tr>`).join('');
 
   document.getElementById('query-results').style.display = 'block';

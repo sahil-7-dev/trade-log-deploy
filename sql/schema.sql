@@ -27,6 +27,7 @@ create table trades (
   rr          numeric(8,4),
   status      text generated always as (
                 case when exit is null then 'Open'
+                     when exit = entry then 'Breakeven'
                      when ((dir='Long' and exit>entry) or (dir='Short' and exit<entry)) then 'Win'
                      else 'Loss'
                 end
