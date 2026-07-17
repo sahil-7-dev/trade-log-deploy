@@ -1244,7 +1244,7 @@ function exportCSV() {
   toast('CSV exported ✓');
 }
 
-async function syncBybit() {
+async function syncBybit(isRetry = false) {
   if (demoGuard()) return;
   const btn = document.querySelector('[data-action="sync-bybit"]');
   const prevText = btn ? btn.textContent : '';
@@ -1256,12 +1256,29 @@ async function syncBybit() {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}` }
     });
+
+    // Same resilience every other Supabase-backed request already has via
+    // sbRequest() — this endpoint was bypassing that entirely with a plain
+    // fetch(), so a session token that happened to be stale at click-time
+    // failed outright instead of silently refreshing and retrying once.
+    if (res.status === 401 && !isRetry) {
+      log.warn('[syncBybit] Got 401, attempting token refresh...');
+      const refreshed = await forceRefreshToken();
+      if (refreshed) {
+        if (btn) { btn.textContent = prevText; btn.disabled = false; }
+        return syncBybit(true);
+      }
+      throw new Error('Session expired — please sign in again');
+    }
+
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Sync failed');
-    toast(data.imported > 0
-      ? `Synced ✓ ${data.imported} trade${data.imported === 1 ? '' : 's'} imported`
-      : (data.message || 'Already up to date — nothing new to import'));
-    if (data.imported > 0) await loadAllData();
+
+    const parts = [];
+    if (data.imported > 0) parts.push(`${data.imported} imported`);
+    if (data.updated > 0) parts.push(`${data.updated} updated`);
+    toast(parts.length ? `Synced ✓ ${parts.join(', ')}` : 'Already up to date — nothing new');
+    if (data.imported > 0 || data.updated > 0) await loadAllData();
   } catch (e) {
     toast(e.message, 'err');
   }
