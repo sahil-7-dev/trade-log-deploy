@@ -1244,6 +1244,31 @@ function exportCSV() {
   toast('CSV exported ✓');
 }
 
+async function syncBybit() {
+  if (demoGuard()) return;
+  const btn = document.querySelector('[data-action="sync-bybit"]');
+  const prevText = btn ? btn.textContent : '';
+  if (btn) { btn.textContent = 'Syncing…'; btn.disabled = true; }
+
+  try {
+    const token = userToken || localStorage.getItem('sb_token') || '';
+    const res = await fetch('/api/bybit-sync', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Sync failed');
+    toast(data.imported > 0
+      ? `Synced ✓ ${data.imported} trade${data.imported === 1 ? '' : 's'} imported`
+      : (data.message || 'Already up to date — nothing new to import'));
+    if (data.imported > 0) await loadAllData();
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+
+  if (btn) { btn.textContent = prevText; btn.disabled = false; }
+}
+
 // ─── DAILY P&L LOG ────────────────────────────────────────────────────────────
 function renderDailyPnlLog() {
   const body = document.getElementById('daily-pnl-body');
@@ -2701,6 +2726,7 @@ document.addEventListener('click', (e) => {
     case 'toggle-balance': toggleBalanceVisibility(); break;
     case 'open-profile-modal': openProfileModal_internal(); break;
     case 'export-csv': exportCSV(); break;
+    case 'sync-bybit': syncBybit(); break;
     case 'open-add-investment': openAddInvestment(); break;
     case 'open-deposit-cash': openAddFundsModal('cash'); break;
     case 'open-add-funds': openAddFundsModal('trading'); break;
