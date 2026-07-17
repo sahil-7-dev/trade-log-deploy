@@ -6,23 +6,32 @@
 // api/bybit-cron.js for the automated (no button click) alternative.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const { syncBybitPositions } = require('./_bybit-shared');
+const { syncBybitPositions, normalizedSupabaseUrl } = require('./_bybit-shared');
 
 async function verifySupabaseUser(accessToken) {
-  const res = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
+  const res = await fetch(`${normalizedSupabaseUrl()}/auth/v1/user`, {
     headers: {
       'Authorization': `Bearer ${accessToken}`,
       'apikey': process.env.SUPABASE_ANON_KEY,
     },
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    // Never log the token itself — but the status/body here is safe and is
+    // exactly what distinguishes "token really is invalid" from "this request
+    // itself is misconfigured" (e.g. a bad SUPABASE_URL/ANON_KEY reaching
+    // Supabase at all, which would show up here as a 4xx unrelated to the
+    // token's actual validity).
+    const body = await res.text().catch(() => '');
+    console.error(`[bybit-sync] Supabase auth check failed: ${res.status} ${body}`);
+    return null;
+  }
   const user = await res.json();
   return user && user.id ? user : null;
 }
 
 function makeDbFetch(accessToken) {
   return async function dbFetch(method, path, body) {
-    const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, {
+    const res = await fetch(`${normalizedSupabaseUrl()}/rest/v1/${path}`, {
       method,
       headers: {
         'Content-Type': 'application/json',

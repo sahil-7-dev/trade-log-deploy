@@ -27,12 +27,12 @@
 //                                 "anyone who found this URL."
 // ═══════════════════════════════════════════════════════════════════════════
 
-const { syncBybitPositions } = require('./_bybit-shared');
+const { syncBybitPositions, normalizedSupabaseUrl } = require('./_bybit-shared');
 
 function makeServiceRoleDbFetch() {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   return async function dbFetch(method, path, body) {
-    const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, {
+    const res = await fetch(`${normalizedSupabaseUrl()}/rest/v1/${path}`, {
       method,
       headers: {
         'Content-Type': 'application/json',

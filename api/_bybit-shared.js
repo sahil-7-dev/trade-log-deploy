@@ -16,6 +16,26 @@ const crypto = require('crypto');
 const BYBIT_BASE = 'https://api.bybit.com';
 const RECV_WINDOW = '5000';
 
+// The frontend build (scripts/build.js) already strips any accidental
+// trailing path/slash from SUPABASE_URL before it reaches the browser — this
+// project has hit that exact misconfiguration before (a stray "/rest/v1/"
+// baked into the raw env var breaks every request built from it, silently,
+// since the resulting URL is just wrong rather than obviously invalid). These
+// serverless functions read process.env.SUPABASE_URL directly and never had
+// that same protection, so the same historical mistake could break auth
+// verification here even after being "fixed" for the frontend. Applying it
+// here too closes that gap.
+function normalizedSupabaseUrl() {
+  const raw = process.env.SUPABASE_URL;
+  if (!raw) return raw;
+  try {
+    const u = new URL(raw);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return String(raw).replace(/\/+$/, '');
+  }
+}
+
 function signBybit(queryString, secret, timestamp, apiKey) {
   const payload = timestamp + apiKey + RECV_WINDOW + queryString;
   return crypto.createHmac('sha256', secret).update(payload).digest('hex');
@@ -143,4 +163,4 @@ async function syncBybitPositions(dbFetch, userId) {
   return { imported, updated };
 }
 
-module.exports = { bybitGet, syncBybitPositions, openKeyFor };
+module.exports = { bybitGet, syncBybitPositions, openKeyFor, normalizedSupabaseUrl };
