@@ -97,36 +97,69 @@ async function syncBybitPositions(dbFetch, userId) {
     const key = openKeyFor(t.symbol, t.side, t.positionIdx || '0');
     const existing = await dbFetch(
       'GET',
-      `trades?user_id=eq.${userId}&external_id=eq.${encodeURIComponent(key)}&select=id`
+      `trades?user_id=eq.${userId}&external_id=eq.${encodeURIComponent(key)}&select=id,size`
     );
 
     const closedDate = new Date(parseInt(t.updatedTime, 10)).toISOString().slice(0, 10);
     const closedExternalId = `bybit-closed:${t.orderId}`;
+    const closedNotional = parseFloat(t.cumEntryValue); // how much THIS event closed, not the position's original total
     const notes = `Synced from Bybit · exchange-reported P&L (incl. fees): $${parseFloat(t.closedPnl).toFixed(2)}`;
+    // NOTE: Bybit's closed-pnl "side" field reflects the order that CLOSED
+    // the position, not the position's own direction — closing a Short means
+    // placing a Buy order to cover, so "side: Buy" here actually means the
+    // position itself was Short. Confirmed against a real account.
+    const dir = t.side === 'Buy' ? 'Short' : 'Long';
 
     if (Array.isArray(existing) && existing.length > 0) {
-      // We already had this tracked as "Open" — turn it into a closed trade
-      // in place, and retire the open-key so it's never matched again.
-      await dbFetch('PATCH', `trades?id=eq.${existing[0].id}`, {
-        exit: parseFloat(t.avgExitPrice),
-        date: closedDate,
-        external_id: closedExternalId,
-        notes,
-      });
-      updated++;
+      const trackedSize = parseFloat(existing[0].size);
+      // Small tolerance for float rounding — Bybit's notional figures rarely
+      // land on an exact match even for a genuine full close.
+      const isFullClose = closedNotional >= trackedSize * 0.99;
+
+      if (isFullClose) {
+        // Turn the tracked row into a closed trade in place, and retire the
+        // open-key so it's never matched again.
+        await dbFetch('PATCH', `trades?id=eq.${existing[0].id}`, {
+          exit: parseFloat(t.avgExitPrice),
+          date: closedDate,
+          external_id: closedExternalId,
+          notes,
+        });
+        updated++;
+      } else {
+        // Partial close — e.g. taking 50% off to reduce risk. This is a
+        // distinct, fully-realized trade in its own right (its own entry,
+        // exit, and P&L), so it gets its own row rather than being folded
+        // into — or worse, mistaken for — the full position closing.
+        // The original row stays Open, just with its size reduced by
+        // however much was actually closed; its external_id is untouched so
+        // the *next* close event (partial or final) can still find it.
+        await dbFetch('POST', 'trades?on_conflict=user_id,external_id', [{
+          user_id: userId,
+          date: closedDate, symbol: t.symbol, type: 'Crypto', dir,
+          entry: parseFloat(t.avgEntryPrice),
+          exit: parseFloat(t.avgExitPrice),
+          size: closedNotional,
+          sl: null, tp: null,
+          source: 'bybit',
+          external_id: closedExternalId,
+          notes: `${notes} (partial close)`,
+        }]);
+        await dbFetch('PATCH', `trades?id=eq.${existing[0].id}`, {
+          size: parseFloat((trackedSize - closedNotional).toFixed(2)),
+        });
+        imported++;
+      }
     } else {
       // No matching open row — likely closed before this integration was
       // ever set up, or an open-position poll was missed. Either way, import
       // it as a complete, already-closed trade.
       await dbFetch('POST', 'trades?on_conflict=user_id,external_id', [{
         user_id: userId,
-        date: closedDate,
-        symbol: t.symbol,
-        type: 'Crypto',
-        dir: t.side === 'Buy' ? 'Long' : 'Short',
+        date: closedDate, symbol: t.symbol, type: 'Crypto', dir,
         entry: parseFloat(t.avgEntryPrice),
         exit: parseFloat(t.avgExitPrice),
-        size: parseFloat(t.cumEntryValue),
+        size: closedNotional,
         sl: null, tp: null,
         source: 'bybit',
         external_id: closedExternalId,
@@ -154,6 +187,9 @@ async function syncBybitPositions(dbFetch, userId) {
       date: new Date(parseInt(p.createdTime, 10)).toISOString().slice(0, 10),
       symbol: p.symbol,
       type: 'Crypto',
+      // Unlike closed-pnl above, position/list's "side" genuinely represents
+      // the position's own direction (Bybit's docs and behavior agree here),
+      // so this mapping is intentionally NOT inverted.
       dir: p.side === 'Buy' ? 'Long' : 'Short',
       entry: parseFloat(p.avgPrice),
       exit: null,
