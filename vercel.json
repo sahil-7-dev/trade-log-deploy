@@ -3,6 +3,7 @@
   "outputDirectory": "public",
   "cleanUrls": true,
   "trailingSlash": false,
+  "regions": ["bom1"],
   "headers": [
     {
       "source": "/(.*)",
