@@ -42,8 +42,13 @@ function signBybit(queryString, secret, timestamp, apiKey) {
 }
 
 async function bybitGet(path, queryParams) {
-  const apiKey = process.env.BYBIT_API_KEY;
-  const apiSecret = process.env.BYBIT_API_SECRET;
+  // .trim() matters here specifically: a trailing space or newline pasted
+  // into Vercel's env var UI is invisible in the dashboard but silently
+  // changes the HMAC output, producing exactly a "signature mismatch" error
+  // with no other symptom — this is the single most common cause of that
+  // error and worth guarding against unconditionally.
+  const apiKey = (process.env.BYBIT_API_KEY || '').trim();
+  const apiSecret = (process.env.BYBIT_API_SECRET || '').trim();
   if (!apiKey || !apiSecret) {
     throw new Error('BYBIT_API_KEY / BYBIT_API_SECRET not configured on the server');
   }
