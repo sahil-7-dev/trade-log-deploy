@@ -94,6 +94,23 @@ async function syncBybitPositions(dbFetch, userId) {
   const closedResult = await bybitGet('/v5/position/closed-pnl', { category: 'linear', limit: '50' });
 
   for (const t of closedResult.list || []) {
+    const closedExternalId = `bybit-closed:${t.orderId}`;
+
+    // Idempotency guard — this is the part that actually matters for partial
+    // closes specifically. A full close retires the open row's external_id,
+    // so re-seeing the same record later naturally falls through to a safe,
+    // upsert-deduplicated insert. A partial close deliberately leaves the
+    // open row's external_id untouched (so a *later, different* close event
+    // can still find it) — but without this check, re-processing the exact
+    // same partial-close record on a later sync would reduce the tracked
+    // open size a second time for the same real-world event, silently
+    // corrupting it further with every repeated run.
+    const alreadyRecorded = await dbFetch(
+      'GET',
+      `trades?user_id=eq.${userId}&external_id=eq.${encodeURIComponent(closedExternalId)}&select=id`
+    );
+    if (Array.isArray(alreadyRecorded) && alreadyRecorded.length > 0) continue;
+
     const key = openKeyFor(t.symbol, t.side, t.positionIdx || '0');
     const existing = await dbFetch(
       'GET',
@@ -101,7 +118,6 @@ async function syncBybitPositions(dbFetch, userId) {
     );
 
     const closedDate = new Date(parseInt(t.updatedTime, 10)).toISOString().slice(0, 10);
-    const closedExternalId = `bybit-closed:${t.orderId}`;
     const closedNotional = parseFloat(t.cumEntryValue); // how much THIS event closed, not the position's original total
     const notes = `Synced from Bybit · exchange-reported P&L (incl. fees): $${parseFloat(t.closedPnl).toFixed(2)}`;
     // NOTE: Bybit's closed-pnl "side" field reflects the order that CLOSED

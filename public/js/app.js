@@ -438,7 +438,14 @@ async function sbRequest(method, path, body = null, isRetry = false, preferHeade
 
 async function sbSelect(table, query = "") {
   const orderCol = table === "investments" ? "buy_date" : "date";
-  const res = await sbRequest("GET", `${table}?${query}&order=${orderCol}.desc`);
+  // Sorting by orderCol alone leaves ties completely undefined — e.g. a
+  // trade that gets closed today has its `date` overwritten to today too
+  // (needed so the P&L calendar attributes realized P&L to the right month),
+  // so an old trade closed today and a brand-new trade opened today can tie
+  // on `date` with no guaranteed order between them. created_at (set once,
+  // at insert, never touched by later updates) breaks that tie reliably —
+  // the truly most-recently-added row always sorts first among ties.
+  const res = await sbRequest("GET", `${table}?${query}&order=${orderCol}.desc,created_at.desc`);
   if (!res.ok) throw new Error(`DB error: ${res.status}`);
   return res.json();
 }
@@ -633,7 +640,11 @@ async function resolveSymbolIds(symbols) {
       log.warn('CoinGecko search failed for', sym, e.message);
     }
   }
-  sessionStorage.setItem('cg_id_cache', JSON.stringify(symbolIdCache));
+  try {
+    sessionStorage.setItem('cg_id_cache', JSON.stringify(symbolIdCache));
+  } catch (e) {
+    log.warn('Failed to persist symbol ID cache to sessionStorage:', e.message);
+  }
 }
 
 async function fetchLivePrices() {
@@ -882,7 +893,7 @@ function updateStatCards(s) {
   setClass('stat-pnl', s.totalPnl >= 0 ? 'green' : 'red');
   set('stat-pnl-sub', s.closed.length ? `${s.winRate}% win rate` : 'No closed trades');
   set('stat-winrate', s.closed.length ? s.winRate + '%' : '—');
-  set('stat-winrate-sub', s.closed.length ? `${s.wins.length}W / ${s.losses.length}L / ${s.open.length} Open` : '—');
+  set('stat-winrate-sub', s.closed.length ? `${s.wins.length}W / ${s.losses.length}L${s.breakeven.length ? ' / ' + s.breakeven.length + ' BE' : ''} / ${s.open.length} Open` : '—');
   set('stat-rr', s.avgRR != null ? s.avgRR.toFixed(2) + 'R' : '—');
   set('stat-rr-sub', s.avgRR ? 'Avg achieved' : 'No RR data');
   set('stat-expect', s.closed.length ? bv(fmt(s.expectancy)) : '—');
@@ -985,7 +996,7 @@ function renderYearlyRecap() {
   set('yr-pnl-sub', s.closed.length ? `${s.winRate}% win rate` : 'No closed trades');
 
   set('yr-winrate', s.closed.length ? s.winRate + '%' : '—');
-  set('yr-winrate-sub', s.closed.length ? `${s.wins.length}W / ${s.losses.length}L / ${s.open.length} Open` : '—');
+  set('yr-winrate-sub', s.closed.length ? `${s.wins.length}W / ${s.losses.length}L${s.breakeven.length ? ' / ' + s.breakeven.length + ' BE' : ''} / ${s.open.length} Open` : '—');
 
   set('yr-rr', s.avgRR != null ? s.avgRR.toFixed(2) + 'R' : '—');
   set('yr-rr-sub', s.avgRR ? 'Avg achieved' : 'No RR data');
