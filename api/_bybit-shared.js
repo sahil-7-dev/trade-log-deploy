@@ -114,12 +114,12 @@ async function syncBybitPositions(dbFetch, userId) {
     const key = openKeyFor(t.symbol, t.side, t.positionIdx || '0');
     const existing = await dbFetch(
       'GET',
-      `trades?user_id=eq.${userId}&external_id=eq.${encodeURIComponent(key)}&select=id,size`
+      `trades?user_id=eq.${userId}&external_id=eq.${encodeURIComponent(key)}&select=id,size,original_size,realized_exit_value`
     );
 
     const closedDate = new Date(parseInt(t.updatedTime, 10)).toISOString().slice(0, 10);
-    const closedNotional = parseFloat(t.cumEntryValue); // how much THIS event closed, not the position's original total
-    const notes = `Synced from Bybit · exchange-reported P&L (incl. fees): $${parseFloat(t.closedPnl).toFixed(2)}`;
+    const closedNotional = parseFloat(t.cumEntryValue); // entry-side notional THIS event closed, not the position's original total
+    const exitValue = parseFloat(t.cumExitValue);        // exit-side notional THIS event realized — needed to compute a correct blended average price across multiple partial fills
     // NOTE: Bybit's closed-pnl "side" field reflects the order that CLOSED
     // the position, not the position's own direction — closing a Short means
     // placing a Buy order to cover, so "side: Buy" here actually means the
@@ -127,49 +127,52 @@ async function syncBybitPositions(dbFetch, userId) {
     const dir = t.side === 'Buy' ? 'Short' : 'Long';
 
     if (Array.isArray(existing) && existing.length > 0) {
-      const trackedSize = parseFloat(existing[0].size);
+      const row = existing[0];
+      const trackedSize = parseFloat(row.size);
+      // Older rows synced before original_size existed won't have it — fall
+      // back to the current tracked size (the best available estimate of
+      // "the whole position") rather than failing on them.
+      const originalSize = row.original_size != null ? parseFloat(row.original_size) : trackedSize;
+      const cumExitValue = parseFloat(row.realized_exit_value || 0) + exitValue;
       // Small tolerance for float rounding — Bybit's notional figures rarely
       // land on an exact match even for a genuine full close.
       const isFullClose = closedNotional >= trackedSize * 0.99;
 
       if (isFullClose) {
-        // Turn the tracked row into a closed trade in place, and retire the
-        // open-key so it's never matched again.
-        await dbFetch('PATCH', `trades?id=eq.${existing[0].id}`, {
-          exit: parseFloat(t.avgExitPrice),
+        // The position is now fully closed — whether this was the only fill
+        // or the last of several partial closes, it becomes ONE merged trade
+        // row: exit is the value-weighted average price across every close
+        // combined (total exit value ÷ the position's original full size),
+        // and size is restored to that original full size so Postgres's P&L
+        // formula reflects the whole position's outcome, not just its final
+        // remaining sliver.
+        const blendedExit = cumExitValue / originalSize;
+        const mergedNote = cumExitValue > exitValue ? ' (merged across multiple partial closes)' : '';
+        await dbFetch('PATCH', `trades?id=eq.${row.id}`, {
+          exit: parseFloat(blendedExit.toFixed(6)),
           date: closedDate,
+          size: originalSize,
           external_id: closedExternalId,
-          notes,
+          notes: `Synced from Bybit${mergedNote} · exchange-reported P&L (incl. fees): $${parseFloat(t.closedPnl).toFixed(2)}`,
         });
         updated++;
       } else {
-        // Partial close — e.g. taking 50% off to reduce risk. This is a
-        // distinct, fully-realized trade in its own right (its own entry,
-        // exit, and P&L), so it gets its own row rather than being folded
-        // into — or worse, mistaken for — the full position closing.
-        // The original row stays Open, just with its size reduced by
-        // however much was actually closed; its external_id is untouched so
-        // the *next* close event (partial or final) can still find it.
-        await dbFetch('POST', 'trades?on_conflict=user_id,external_id', [{
-          user_id: userId,
-          date: closedDate, symbol: t.symbol, type: 'Crypto', dir,
-          entry: parseFloat(t.avgEntryPrice),
-          exit: parseFloat(t.avgExitPrice),
-          size: closedNotional,
-          sl: null, tp: null,
-          source: 'bybit',
-          external_id: closedExternalId,
-          notes: `${notes} (partial close)`,
-        }]);
-        await dbFetch('PATCH', `trades?id=eq.${existing[0].id}`, {
+        // Partial close — accumulate into the SAME row rather than creating
+        // a new one: reduce the tracked remaining size, and add this fill's
+        // exit value to the running total that the eventual full close will
+        // use to compute the correct blended price. The row stays Open and
+        // keeps its open-key, so the next close (partial or final) can still
+        // find and match it.
+        await dbFetch('PATCH', `trades?id=eq.${row.id}`, {
           size: parseFloat((trackedSize - closedNotional).toFixed(2)),
+          realized_exit_value: parseFloat(cumExitValue.toFixed(2)),
         });
-        imported++;
+        updated++;
       }
     } else {
       // No matching open row — likely closed before this integration was
       // ever set up, or an open-position poll was missed. Either way, import
-      // it as a complete, already-closed trade.
+      // it as a single complete already-closed trade (nothing to blend).
       await dbFetch('POST', 'trades?on_conflict=user_id,external_id', [{
         user_id: userId,
         date: closedDate, symbol: t.symbol, type: 'Crypto', dir,
@@ -179,7 +182,7 @@ async function syncBybitPositions(dbFetch, userId) {
         sl: null, tp: null,
         source: 'bybit',
         external_id: closedExternalId,
-        notes,
+        notes: `Synced from Bybit · exchange-reported P&L (incl. fees): $${parseFloat(t.closedPnl).toFixed(2)}`,
       }]);
       imported++;
     }
@@ -210,6 +213,8 @@ async function syncBybitPositions(dbFetch, userId) {
       entry: parseFloat(p.avgPrice),
       exit: null,
       size: parseFloat(p.positionValue),
+      original_size: parseFloat(p.positionValue), // baseline for blending future partial closes
+      realized_exit_value: 0,
       sl: null, tp: null,
       source: 'bybit',
       external_id: key,

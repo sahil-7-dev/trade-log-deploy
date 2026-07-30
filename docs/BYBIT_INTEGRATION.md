@@ -46,7 +46,7 @@ Both entry points call the exact same `syncBybitPositions()` function in `api/_b
 
 ## What actually happens on each sync
 
-1. **Fetch recently closed positions** from Bybit (`/v5/position/closed-pnl`). For each one, check whether an "Open" row already exists for that position. If the closed amount covers the whole tracked size, **update that row in place** (fill in exit price, close date, switch it to a permanent closed-record ID). If it only covers part of it — a partial close — insert a separate, correctly-sized trade for just that portion and reduce the tracked open row's size instead of closing it. If no open row exists at all, insert it as a complete already-closed trade.
+1. **Fetch recently closed positions** from Bybit (`/v5/position/closed-pnl`). For each one, check whether an "Open" row already exists for that position. If the closed amount covers the whole tracked size, **finalize that row in place** — exit price becomes a value-weighted average across every fill this position ever had (a single fill or several partial closes, same formula either way), close date and a permanent closed-record ID get set. If it only covers part of it — a partial close — the tracked row's remaining size shrinks and its running exit-value total grows, but it **stays open and stays the same row**; nothing new gets inserted. If no open row exists at all, insert it as a complete already-closed trade.
 2. **Fetch currently open positions** (`/v5/position/list`). For each one not already tracked, insert a new trade row with `exit: null` — which the existing schema already renders as `status = 'Open'`, no changes needed there.
 
 This means opening a position gets it into the Trade Log (as Open) on the *next* sync after you open it, and closing it updates that same row (rather than creating a duplicate) on the next sync after you close it. "Next sync" is either whenever you click the button, or however often your automation runs — see below for what "automatic" actually costs to make frequent.
@@ -56,7 +56,7 @@ This means opening a position gets it into the Trade Log (as Open) on the *next*
 Bybit doesn't give a position one stable ID across its whole lifetime the way a single order does. To match an open row to its later close, each currently-open position gets a deterministic key: `bybit-open:{symbol}:{side}:{positionIdx}`. When that same symbol+side later shows up in the closed-positions feed, the matching open row (if any) gets updated and its key permanently swapped to `bybit-closed:{orderId}` — so it can never be matched or touched again by the open-position step.
 
 **Known edge cases this doesn't specially handle:**
-- **Partial closes are handled as their own trade.** Taking 50% off a position to reduce risk, for example, gets logged as a complete, correctly-sized closed trade for just that portion — not folded into (or mistaken for) the position's eventual full close. Detected by comparing the notional value Bybit reports as closed in that specific event (`cumEntryValue`) against the tracked open row's current size: if it covers the whole tracked size (within a small rounding tolerance), that's a full close; otherwise the open row's size is reduced by exactly what closed, and it stays Open — so a second partial close, or the eventual final close, still matches correctly against the right remaining amount.
+- **Partial closes merge into one final trade, not separate rows.** Taking 50% off a position to reduce risk (and later closing the rest) shows up in the Trade Log as a single entry for the whole position, not fragmented into one row per partial close. Every partial close accumulates into the same tracked row — its remaining size shrinks, and its exit-side notional value adds to a running total (`realized_exit_value`) — until the position is fully closed, at which point that single row finalizes with a *value-weighted average exit price* across every fill combined (total exit value ÷ the position's original full size, stored separately as `original_size` so it never shrinks). That gives one accurate P&L number for the whole position's lifecycle, computed the same way a single-fill close would be.
 - **Hedge mode** (simultaneous long+short on the same symbol) is disambiguated via `positionIdx`, which Bybit assigns per side in hedge mode — should work correctly, but I haven't been able to test this against a real hedge-mode account.
 - **A position closing and a new one opening on the same symbol+side between two poll cycles** could theoretically race — the close-matching step runs before the open-scanning step specifically to reduce this, but with infrequent polling (e.g. once a day) it's more likely to matter than with frequent polling.
 
@@ -77,6 +77,8 @@ Already in the full `sql/schema.sql` for fresh setups. For an existing `trades` 
 alter table trades add column if not exists source text default 'manual';
 alter table trades add column if not exists external_id text;
 alter table trades add constraint uq_trades_external_id unique (user_id, external_id);
+alter table trades add column if not exists original_size numeric(18,2);
+alter table trades add column if not exists realized_exit_value numeric(18,2) default 0;
 ```
 
 ### 3. Add Vercel env vars

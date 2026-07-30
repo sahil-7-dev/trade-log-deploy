@@ -34,7 +34,27 @@ create table trades (
               ) stored,
   setup       text,
   notes       text,
-  tags        text[]
+  tags        text[],
+  -- Populated only for trades imported via an exchange sync (e.g. Bybit);
+  -- null for anything logged manually through the app. A plain unique
+  -- constraint is enough here — SQL treats every NULL as distinct from every
+  -- other NULL, so manual trades (external_id always null) never conflict
+  -- with each other; only a repeated import of the *same* external_id would.
+  source      text default 'manual',
+  external_id text,
+  -- Both only meaningful while a Bybit-synced position is open and being
+  -- partially closed over time: original_size is the position's full size at
+  -- open (never shrinks — needed so the FINAL close's P&L is computed over
+  -- the whole position, not just its last remaining sliver, merging every
+  -- partial close into one final trade instead of a fragmented row per
+  -- close); realized_exit_value accumulates the exit-side notional value
+  -- from each partial close as it happens, so the eventual full close can
+  -- compute a correctly weighted-average exit price across every fill
+  -- combined. Stay null/irrelevant for manual trades and for trades that
+  -- were never partially closed.
+  original_size        numeric(18,2),
+  realized_exit_value  numeric(18,2) default 0,
+  unique (user_id, external_id)
 );
 
 create table investments (
