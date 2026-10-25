@@ -1,0 +1,19 @@
+/* Printable monthly report — only #report-view prints (loaded with media="print") */
+@page { margin: 14mm; }
+body > *:not(#report-view) { display: none !important; }
+html, body { background: #fff !important; color: #111 !important; height: auto; overflow: visible; }
+#report-view { display: block !important; font-family: var(--sans); color: #111; font-size: 11px; }
+#report-view h3 { font-size: 13px; margin: 18px 0 6px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+.rp-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 12px; }
+.rp-title { font-size: 18px; font-weight: 700; }
+.rp-brand { font-family: var(--mono); font-size: 16px; }
+.rp-brand b { color: #0a9e80; }
+.rp-muted { color: #666; font-size: 10px; }
+.rp-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.rp-stat { border: 1px solid #ddd; border-radius: 6px; padding: 6px 8px; }
+.rp-label { font-size: 8px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+.rp-val { font-family: var(--mono); font-size: 13px; font-weight: 700; margin-top: 2px; }
+.rp-table { width: 100%; border-collapse: collapse; font-size: 10px; min-width: 0 !important; }
+.rp-table th, .rp-table td { border-bottom: 1px solid #e5e5e5; padding: 4px 6px; text-align: left; white-space: nowrap; color: #111; }
+.rp-table th { font-size: 8px; text-transform: uppercase; color: #666; }
+.rp-table tr { page-break-inside: avoid; }

@@ -1,0 +1,123 @@
+<section class="page" id="page-trades" aria-labelledby="tl-h">
+  <div class="page-header">
+    <div>
+      <h1 id="tl-h">Trade Log</h1>
+      <p>Every trade in the selected period. Click a symbol for full details, or a column header to sort.</p>
+    </div>
+    <div class="page-header-actions">
+      <button class="btn btn-ghost" data-action="open-import">↥ Import CSV</button>
+      <button class="btn btn-ghost" data-action="export-csv">↓ Export CSV</button>
+      <button class="btn btn-primary" data-action="open-add-trade">+ Log trade</button>
+    </div>
+  </div>
+
+  <!-- Trading balance + money actions -->
+  <div class="grid-2-1">
+    <div class="stat-card" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+      <div>
+        <div class="stat-label">Trading balance</div>
+        <div class="stat-val green" id="tl-balance" style="font-size:24px"><span class="balance-val">$0.00</span></div>
+        <div class="stat-sub">Deposits − withdrawals + net P&amp;L of closed trades</div>
+      </div>
+      <button class="filter-btn" data-action="show-page" data-page="money">Funds history →</button>
+    </div>
+    <div class="stat-card balance-actions">
+      <button class="btn btn-primary" data-action="open-funds" data-account="trading" data-kind="deposit">＋ Deposit</button>
+      <button class="btn btn-ghost" data-action="open-funds" data-account="trading" data-kind="withdraw_bank">－ Withdraw</button>
+      <button class="btn btn-ghost" data-action="open-funds" data-account="trading" data-kind="transfer">⇆ Transfer</button>
+      <button class="btn btn-ghost" data-action="open-calculator">⊞ Size calc</button>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-label">Total trades</div><div class="stat-val" id="tl-total">—</div><div class="stat-sub" id="tl-total-sub">—</div></div>
+    <div class="stat-card"><div class="stat-label">Profit factor</div><div class="stat-val green" id="tl-pf">—</div><div class="stat-sub">Gross win / gross loss</div></div>
+    <div class="stat-card"><div class="stat-label">Avg win</div><div class="stat-val green" id="tl-avgwin">—</div><div class="stat-sub">Closed winners</div></div>
+    <div class="stat-card"><div class="stat-label">Avg loss</div><div class="stat-val red" id="tl-avgloss">—</div><div class="stat-sub">Closed losers</div></div>
+    <div class="stat-card"><div class="stat-label">Best streak</div><div class="stat-val green" id="tl-bstreak">—</div><div class="stat-sub">Consecutive wins</div></div>
+    <div class="stat-card"><div class="stat-label">Worst streak</div><div class="stat-val red" id="tl-wstreak">—</div><div class="stat-sub">Consecutive losses</div></div>
+  </div>
+
+  <!-- Closed Positions: fully closed only (what every other stat uses).
+       Closed Trades: also includes what partial closes have realized
+       on positions that are still partly open. -->
+  <div class="grid-4">
+    <div class="stat-card">
+      <div class="stat-label">Closed positions <span class="muted" data-tip="Fully closed trades only — what every other stat uses." tabindex="0">ⓘ</span></div>
+      <div class="stat-val" id="tl-closed-pos">—</div><div class="stat-sub" id="tl-closed-pos-sub">Fully closed only</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Closed trades <span class="muted" data-tip="Also includes what partial closes have realized on positions that are still partly open." tabindex="0">ⓘ</span></div>
+      <div class="stat-val" id="tl-closed-trades">—</div><div class="stat-sub" id="tl-closed-trades-sub">Includes partial closes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Open P&amp;L (live)</div>
+      <div class="stat-val" id="tl-open-pnl">—</div><div class="stat-sub" id="tl-open-pnl-sub">Unrealized, at live prices</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Fees paid <span class="muted" data-tip="Every fee in this period, open trades included. Buy and sell fees come from your rates or what you typed; Bybit trades report one combined fee (other)." tabindex="0">ⓘ</span></div>
+      <div class="stat-val amber" id="tl-fees">—</div><div class="stat-sub" id="tl-fees-sub">—</div>
+    </div>
+  </div>
+
+  <div class="table-card">
+    <div class="table-header">
+      <div class="table-title">All trades</div>
+      <div class="table-filters" role="group" aria-label="Status">
+        <button class="filter-btn active" data-action="filter-all" data-filter="All">All</button>
+        <button class="filter-btn" data-action="filter-all" data-filter="Open">Open</button>
+        <button class="filter-btn" data-action="filter-all" data-filter="Win">Wins</button>
+        <button class="filter-btn" data-action="filter-all" data-filter="Loss">Losses</button>
+        <button class="filter-btn" data-action="filter-all" data-filter="Breakeven">Breakeven</button>
+      </div>
+    </div>
+    <div class="filter-bar">
+      <input class="form-input" id="tl-search" placeholder="Search symbol, notes, setup, tags…  ( / )" style="flex:2;min-width:180px" aria-label="Search trades">
+      <select class="form-select" id="tl-f-type" aria-label="Asset type"><option value="">All assets</option><option>Crypto</option><option>Forex</option><option>Stocks</option></select>
+      <select class="form-select" id="tl-f-dir" aria-label="Direction"><option value="">Long &amp; Short</option><option>Long</option><option>Short</option></select>
+      <select class="form-select" id="tl-f-setup" aria-label="Setup"><option value="">All setups</option></select>
+      <select class="form-select" id="tl-f-tag" aria-label="Tag"><option value="">All tags</option></select>
+      <select class="form-select" id="tl-f-source" aria-label="Source"><option value="">All sources</option><option value="manual">Manual</option><option value="bybit">Bybit</option><option value="import">Imported</option></select>
+      <button class="filter-btn" data-action="tl-clear-filters">Clear</button>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th class="sortable" data-action="tl-sort" data-sort="date">Date</th>
+            <th class="sortable" data-action="tl-sort" data-sort="symbol">Symbol</th>
+            <th class="sortable" data-action="tl-sort" data-sort="type">Type</th>
+            <th class="sortable" data-action="tl-sort" data-sort="dir">Direction</th>
+            <th class="sortable" data-action="tl-sort" data-sort="entry">Entry</th>
+            <th class="sortable" data-action="tl-sort" data-sort="exit">Exit</th>
+            <th class="sortable" data-action="tl-sort" data-sort="pnl">P&amp;L</th>
+            <th class="sortable" data-action="tl-sort" data-sort="rr">RR</th>
+            <th class="sortable" data-action="tl-sort" data-sort="status">Status</th>
+            <th>Tags</th><th>Notes</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="all-trades-body"></tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <div id="tl-pager" class="pager-info"></div>
+      <select class="form-select" id="tl-page-size" aria-label="Trades per page">
+        <option value="25">25 / page</option><option value="50">50 / page</option><option value="100">100 / page</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Breakeven trades — net P&L of $0.00. Counted separately from Win/Loss
+       since a scratch isn't a decision outcome, but its P&L still counts. -->
+  <div class="table-card" id="breakeven-card" style="display:none">
+    <div class="table-header">
+      <div class="table-title">Breakeven trades <span id="breakeven-summary" class="chart-sub"></span></div>
+    </div>
+    <div class="table-scroll capped" style="max-height:260px">
+      <table>
+        <thead><tr><th>Date</th><th>Symbol</th><th>Type</th><th>Direction</th><th>Entry</th><th>Exit</th><th>P&amp;L</th></tr></thead>
+        <tbody id="breakeven-body"></tbody>
+      </table>
+    </div>
+  </div>
+</section>

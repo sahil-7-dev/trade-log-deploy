@@ -1,0 +1,51 @@
+<!-- FUNDS MODAL — deposit / withdraw / adjust / transfer, either account -->
+<div class="modal-overlay" id="funds-modal">
+  <div class="modal" style="width:440px">
+    <div class="modal-title" id="fm-title">Deposit</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Account</label>
+        <select class="form-select" id="fm-account">
+          <option value="trading">Trading</option>
+          <option value="investing">Investing cash</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">What</label>
+        <select class="form-select" id="fm-action">
+          <option value="deposit">Deposit</option>
+          <option value="withdraw_bank">Withdraw → bank account</option>
+          <option value="withdraw_removed">Withdraw → removed cash</option>
+          <option value="adjustment">Adjust balance</option>
+          <option value="transfer">Transfer to other account</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <div id="fm-hint" style="font-size:11px;color:var(--muted);line-height:1.5"></div>
+      </div>
+      <div class="form-group" id="fm-adjust-group" style="display:none">
+        <label class="form-label">Direction</label>
+        <select class="form-select" id="fm-adjust-dir">
+          <option value="+">Increase balance</option>
+          <option value="-">Decrease balance</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Amount ($)</label>
+        <input class="form-input" type="number" placeholder="0.00" id="fm-amount">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input class="form-input" type="date" id="fm-date">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Note <span style="text-transform:none;letter-spacing:0">(optional)</span></label>
+        <input class="form-input" id="fm-note" placeholder="e.g. HDFC savings, monthly SIP, profit withdrawal">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="close-modal" data-modal="funds-modal">Cancel</button>
+      <button class="btn btn-primary" id="fm-submit" data-action="submit-funds">Deposit</button>
+    </div>
+  </div>
+</div>

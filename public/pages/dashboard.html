@@ -1,0 +1,110 @@
+<section class="page active" id="page-dashboard" aria-labelledby="dash-h">
+  <div class="page-header">
+    <div>
+      <h1 id="dash-h">Overview</h1>
+      <p id="dash-period">Your trading at a glance.</p>
+    </div>
+    <div class="page-header-actions">
+      <button class="btn btn-ghost" data-action="open-funds" data-account="trading" data-kind="deposit">＋ Deposit</button>
+      <button class="btn btn-ghost" data-action="open-calculator">⊞ Size calculator</button>
+    </div>
+  </div>
+
+  <!-- Hero: the one number this page leads with -->
+  <div class="hero-card" id="dash-hero"></div>
+
+  <!-- KPI tiles -->
+  <div class="stats-row" id="dash-kpis"></div>
+
+  <div class="grid-2-1">
+    <!-- grows to the height of the right-hand column -->
+    <div class="chart-card" style="display:flex;flex-direction:column">
+      <div class="chart-header">
+        <div class="chart-title">Equity curve <span class="chart-sub">cumulative net P&amp;L</span></div>
+        <div class="chart-tools"><span class="chart-meta" id="eq-meta"></span><button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button></div>
+      </div>
+      <div class="chart-wrap" style="flex:1;min-height:300px"><canvas id="equityChart" aria-label="Equity curve"></canvas></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="chart-card" id="dash-networth-card">
+        <div class="chart-header">
+          <div class="chart-title">Net worth <span class="chart-sub">trading + investing</span></div>
+          <button class="filter-btn" data-action="show-page" data-page="networth">Details →</button>
+        </div>
+        <div id="dash-networth"></div>
+      </div>
+      <div class="chart-card" id="goals-card">
+        <div class="chart-header">
+          <div class="chart-title">Goals &amp; limits</div>
+          <button class="filter-btn" data-action="show-page" data-page="settings">Edit</button>
+        </div>
+        <div id="goals-body" style="display:flex;flex-direction:column;gap:16px"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Outcomes</div>
+          <span class="chart-meta" id="wl-meta"></span>
+        </div>
+        <div id="dash-outcomes"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Daily P&amp;L <span class="chart-sub">last 30 trading days</span></div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:220px"><canvas id="dailyPnlChart" aria-label="Daily P&L"></canvas></div>
+    </div>
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-title">Open positions <span class="chart-sub" id="dash-open-meta"></span></div>
+        <button class="filter-btn" data-action="show-page" data-page="risk">Exposure →</button>
+      </div>
+      <div class="table-scroll capped" style="max-height:236px">
+        <table>
+          <thead><tr><th>Symbol</th><th>Dir</th><th>Size</th><th>Entry</th><th>Live</th><th>Unrealized</th></tr></thead>
+          <tbody id="dash-open-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Monthly P&amp;L heatmap <span class="chart-sub" id="heatmap-year-label"></span></div>
+      <div class="scale-legend" style="margin:0"><span>Loss</span><span class="ramp"></span><span>Profit</span></div>
+    </div>
+    <div class="heatmap-scroll">
+      <div class="hm-months">
+        <div class="hm-month">JAN</div><div class="hm-month">FEB</div><div class="hm-month">MAR</div>
+        <div class="hm-month">APR</div><div class="hm-month">MAY</div><div class="hm-month">JUN</div>
+        <div class="hm-month">JUL</div><div class="hm-month">AUG</div><div class="hm-month">SEP</div>
+        <div class="hm-month">OCT</div><div class="hm-month">NOV</div><div class="hm-month">DEC</div>
+      </div>
+      <div class="heatmap-grid" id="heatmap"></div>
+    </div>
+  </div>
+
+  <div class="table-card">
+    <div class="table-header">
+      <div class="table-title" id="recent-trades-title">This Month's Trades</div>
+      <div class="table-filters">
+        <button class="filter-btn active" data-action="filter-recent" data-filter="All">All</button>
+        <button class="filter-btn" data-action="filter-recent" data-filter="Crypto">Crypto</button>
+        <button class="filter-btn" data-action="filter-recent" data-filter="Forex">Forex</button>
+        <button class="filter-btn" data-action="filter-recent" data-filter="Stocks">Stocks</button>
+      </div>
+    </div>
+    <div class="table-scroll capped">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Symbol</th><th>Type</th><th>Direction</th><th>Entry</th><th>Exit</th><th>P&amp;L</th><th>RR</th><th>Status</th></tr>
+        </thead>
+        <tbody id="recent-trades-body"></tbody>
+      </table>
+    </div>
+  </div>
+</section>

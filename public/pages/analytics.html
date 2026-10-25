@@ -1,0 +1,59 @@
+<section class="page" id="page-analytics" aria-labelledby="perf-h">
+  <div class="page-header">
+    <div>
+      <h1 id="perf-h">Performance</h1>
+      <p>Where your P&amp;L comes from — by month, setup, symbol and asset type. Every chart can switch to a table.</p>
+    </div>
+  </div>
+
+  <div class="stats-row" id="perf-kpis"></div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Monthly net P&amp;L</div>
+      <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+    </div>
+    <div class="chart-wrap" style="height:230px"><canvas id="monthlyPnlChart" aria-label="Monthly net P&L"></canvas></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Cumulative P&amp;L by setup <span class="chart-sub">top 4 + other</span></div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:260px"><canvas id="setupCurveChart" aria-label="Cumulative P&L by setup"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">P&amp;L by symbol <span class="chart-sub">top 10 by size</span></div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:260px"><canvas id="symbolPnlChart" aria-label="P&L by symbol"></canvas></div>
+    </div>
+  </div>
+
+  <div class="analytics-grid">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">P&amp;L by asset type</div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:190px"><canvas id="assetPnlChart" aria-label="P&L by asset type"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Win rate by asset type</div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:190px"><canvas id="winRateAssetChart" aria-label="Win rate by asset type"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">P&amp;L distribution <span class="chart-sub">trades per result</span></div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:190px"><canvas id="pnlDistChart" aria-label="P&L distribution"></canvas></div>
+    </div>
+  </div>
+</section>

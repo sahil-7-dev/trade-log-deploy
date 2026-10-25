@@ -1,0 +1,70 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Design tokens — every color, size and font the UI uses. Change the look
+   here; the other stylesheets only reference these.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces, darkest → lightest */
+  --bg: #08090c;            /* page plane */
+  --surface: #101218;       /* cards */
+  --surface2: #161922;      /* raised: hovers, inputs-on-cards, menus */
+  --surface3: #1c202b;      /* active / pressed */
+  --border: #1e2230;        /* hairlines */
+  --border-strong: #2a2f40;
+  --faint: #2a2d3a;
+
+  /* Ink */
+  --text: #e8eaf0;
+  --text-2: #b9bccb;        /* secondary */
+  --muted: #8b8fa8;         /* labels, axis */
+
+  /* Brand + semantic (text, badges, buttons) */
+  --green: #00d4aa;
+  --green-dim: rgba(0, 212, 170, 0.12);
+  --red: #ff4d6d;
+  --red-dim: rgba(255, 77, 109, 0.12);
+  --amber: #f5a623;
+  --amber-dim: rgba(245, 166, 35, 0.12);
+  --blue: #4a9eff;
+  --blue-dim: rgba(74, 158, 255, 0.12);
+  --violet: #9085e9;
+
+  /* Chart marks — validated (dataviz validator, dark surface #111318):
+     profit/loss pair passes CVD separation (ΔE 13.7 deutan) and 3:1 contrast;
+     categorical = reference palette dark steps, fixed order, all checks pass. */
+  --chart-profit: #12ad86;
+  --chart-loss: #b82e46;
+  --chart-in: #3987e5;
+  --chart-out: #d95926;
+  --chart-grid: #1a1e2a;
+  --chart-axis: #2a2f40;
+  --chart-neutral: #262a36;
+
+  /* Type */
+  --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
+  --fs-xs: 10px;
+  --fs-sm: 11px;
+  --fs-md: 12.5px;
+  --fs-lg: 15px;
+  --fs-xl: 20px;
+  --fs-hero: 40px;
+
+  /* Shape + depth */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --ring: 0 0 0 2px var(--bg), 0 0 0 4px rgba(0, 212, 170, 0.55);
+
+  /* Spacing scale */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px;
+
+  /* Layout */
+  --sidebar-w: 232px;
+  --sidebar-w-collapsed: 64px;
+  --topbar-h: 56px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}

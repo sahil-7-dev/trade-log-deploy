@@ -1,0 +1,85 @@
+<section class="page" id="page-insights" aria-labelledby="ins-h">
+  <div class="page-header">
+    <div>
+      <h1 id="ins-h">Insights</h1>
+      <p>What separates your winners from your losers — timing, discipline, mistakes and how long you hold.</p>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Advanced metrics</div>
+      <div class="chart-meta">Hover a metric for what it means</div>
+    </div>
+    <div class="metrics-grid" id="adv-metrics"></div>
+  </div>
+
+  <div class="table-card">
+    <div class="table-header">
+      <div class="table-title">Performance by</div>
+      <select class="form-select" id="group-by" style="width:auto;font-size:11px" aria-label="Group trades by">
+        <option value="setup">Setup / strategy</option>
+        <option value="tag">Tag</option>
+        <option value="symbol">Symbol</option>
+        <option value="mistake">Mistake</option>
+        <option value="emotion">Emotion</option>
+        <option value="followed">Followed plan?</option>
+        <option value="dir">Long vs Short</option>
+        <option value="type">Asset type</option>
+        <option value="weekday">Weekday</option>
+        <option value="hour">Hour closed</option>
+        <option value="session">Market session</option>
+        <option value="hold">Holding time</option>
+        <option value="source">Source</option>
+      </select>
+    </div>
+    <div class="table-scroll capped" style="max-height:380px">
+      <table>
+        <thead>
+          <tr><th id="group-col-name">Setup</th><th>Trades</th><th>Win rate</th><th>Net P&amp;L</th><th style="width:22%"></th><th>Avg / trade</th><th>Avg R</th><th>Fees</th></tr>
+        </thead>
+        <tbody id="group-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">When you make money <span class="chart-sub">net P&amp;L by weekday × hour closed</span></div>
+      <div class="chart-tools"><span class="chart-meta" id="wh-meta"></span></div>
+    </div>
+    <div id="wh-heat"></div>
+    <div class="scale-legend"><span>Loss</span><span class="ramp"></span><span>Profit</span><span style="margin-left:10px">Empty = no trades</span></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-header"><div class="chart-title">Discipline <span class="chart-sub">followed plan vs broke plan</span></div></div>
+      <div id="plan-compare"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">What each mistake cost</div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:220px"><canvas id="mistakeChart" aria-label="Net P&L by mistake"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-2-1">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Holding time vs result</div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:260px"><canvas id="holdScatterChart" aria-label="Holding time vs P&L"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">By market session</div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:260px"><canvas id="sessionChart" aria-label="Net P&L by market session"></canvas></div>
+    </div>
+  </div>
+</section>

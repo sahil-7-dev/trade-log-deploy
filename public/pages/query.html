@@ -1,0 +1,73 @@
+<section class="page" id="page-query" aria-labelledby="query-h">
+  <div class="page-header">
+    <div>
+      <h1 id="query-h">Query Builder</h1>
+      <p>Filter your trades with conditions — the matching SQL is shown so you can run it in Supabase too.</p>
+    </div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Quick Filters</div>
+      <div class="chart-meta">Click to load</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px" id="presets-bar"></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Build Your Query</div>
+      <div class="chart-meta" id="q-count"></div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px" id="conditions-wrap"></div>
+
+    <div style="display:flex;gap:8px;margin-top:14px;align-items:center">
+      <button class="btn btn-ghost" data-action="add-condition" style="font-size:11px">+ Add Filter</button>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--muted)">Sort by</span>
+        <select class="form-select" id="q-sort-field" style="width:140px;padding:6px 10px;font-size:11px">
+          <option value="date">Date</option>
+          <option value="pnl">P&L</option>
+          <option value="rr">RR</option>
+          <option value="size">Size</option>
+        </select>
+        <select class="form-select" id="q-sort-dir" style="width:90px;padding:6px 10px;font-size:11px">
+          <option value="desc">DESC</option>
+          <option value="asc">ASC</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" data-action="run-query" style="font-size:11px">Run Query</button>
+    </div>
+  </div>
+
+  <div class="chart-card" id="sql-card" style="display:none">
+    <div class="chart-header">
+      <div class="chart-title">Generated SQL <span style="font-size:9px;color:var(--muted);font-weight:400;margin-left:8px">Supabase-ready</span></div>
+      <button class="btn btn-ghost" data-action="copy-sql" style="font-size:10px;padding:4px 10px">Copy</button>
+    </div>
+    <pre id="sql-output" style="font-family:var(--mono);font-size:11px;color:var(--green);background:var(--bg);padding:14px;border-radius:8px;overflow-x:auto;line-height:1.7;white-space:pre-wrap"></pre>
+  </div>
+
+  <div class="table-card" id="query-results" style="display:none">
+    <div class="table-header">
+      <div class="table-title">Results <span id="result-count" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-left:6px"></span></div>
+      <div style="display:flex;gap:16px">
+        <div style="font-family:var(--mono);font-size:11px">Total P&L: <span id="res-pnl" class="green"></span></div>
+        <div style="font-family:var(--mono);font-size:11px">Avg RR: <span id="res-rr" class="blue"></span></div>
+        <div style="font-family:var(--mono);font-size:11px">Win Rate: <span id="res-wr" class="green"></span></div>
+      </div>
+    </div>
+    <div style="overflow:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th><th>Symbol</th><th>Type</th><th>Direction</th>
+          <th>Entry</th><th>Exit</th><th>P&L</th><th>RR</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="query-results-body"></tbody>
+    </table>
+    </div>
+  </div>
+</section>

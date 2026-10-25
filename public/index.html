@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#08090c">
+<title>TradeLog — Journal</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- integrity: the browser refuses the file if the CDN ever serves anything else -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js" integrity="sha384-DhxhYObIMeMNGyAG7iK11OHzBIKyEIeRL0ad1iFPAOwZB8iirUlTT0O/WJJUk8+o" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- Styles: tokens → base → layout → components → charts → pages; print last -->
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/charts.css">
+<link rel="stylesheet" href="css/pages.css">
+<link rel="stylesheet" href="css/print.css" media="print">
+</head>
+<body>
+
+<!-- TOAST -->
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:200;align-items:center;justify-content:center">
+  <div class="auth-card" style="width:380px;max-width:calc(100vw - 32px);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px">
+    <div style="font-family:var(--mono);font-size:20px;font-weight:700;margin-bottom:4px">Trade<span style="color:var(--green)">Log</span></div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:28px;letter-spacing:0.5px">Your personal trading journal</div>
+    <div id="auth-signin-panel" style="display:flex;flex-direction:column;gap:12px">
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Email</div>
+        <input id="auth-email" type="email" placeholder="you@email.com" class="form-input" style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px;display:flex;justify-content:space-between">
+          <span>Password</span>
+          <button class="link-btn" data-action="forgot-password" style="text-transform:none;letter-spacing:0">Forgot password?</button>
+        </div>
+        <input id="auth-pass" type="password" placeholder="••••••••" class="form-input" style="width:100%">
+      </div>
+      <div id="auth-msg" style="font-size:11px;min-height:16px"></div>
+      <button class="btn btn-primary" data-action="sign-in" style="width:100%;padding:10px">Sign In</button>
+      <button class="btn btn-ghost" data-action="sign-up" style="width:100%;padding:10px">Create Account</button>
+      <button id="back-to-demo-btn" data-action="back-to-demo" style="display:none;background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:4px;text-align:center">← Back to demo</button>
+    </div>
+    <!-- Shown when arriving from a password-reset email link -->
+    <div id="auth-reset-panel" style="display:none;flex-direction:column;gap:12px">
+      <div style="font-size:12px;color:var(--muted)">Choose a new password for your account.</div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">New password</div>
+        <input id="auth-new-pass" type="password" placeholder="At least 6 characters" class="form-input" style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Repeat new password</div>
+        <input id="auth-new-pass2" type="password" placeholder="••••••••" class="form-input" style="width:100%">
+      </div>
+      <div id="auth-reset-msg" style="font-size:11px;min-height:16px"></div>
+      <button class="btn btn-primary" data-action="submit-new-password" style="width:100%;padding:10px">Save new password</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING BAR -->
+<div id="loading-bar" style="display:none;position:fixed;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--blue));z-index:300;animation:loadpulse 1s ease-in-out infinite"></div>
+
+<div id="app-shell" style="display:none" class="app">
+  <div class="sidebar-backdrop" data-action="toggle-sidebar"></div>
+
+  <!-- SIDEBAR — nav items are generated from the page registry (js/core/router.js) -->
+  <aside class="sidebar" aria-label="Main navigation">
+    <div class="logo">
+      <div class="logo-mark" aria-hidden="true">TL</div>
+      <div>
+        <div class="logo-text">Trade<span>Log</span></div>
+        <div class="logo-sub">Journal &amp; analytics</div>
+      </div>
+      <button class="sidebar-collapse" data-action="toggle-sidebar-collapsed" title="Collapse sidebar" aria-label="Collapse sidebar">«</button>
+    </div>
+
+    <div class="currency-toggle" role="group" aria-label="Currency">
+      <button class="active" data-action="set-currency" data-currency="USD">$ USD</button>
+      <button data-action="set-currency" data-currency="INR">₹ INR</button>
+    </div>
+
+    <nav class="nav" id="nav"></nav>
+
+    <div class="sidebar-footer">
+      <div class="total-equity" data-action="show-page" data-page="networth" style="cursor:pointer" title="Open Net Worth">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div class="total-equity-label">Net Worth</div>
+          <button id="hide-balance-btn" data-action="toggle-balance" title="Hide/show balances (H)"
+            style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;border-radius:4px;line-height:1">👁</button>
+        </div>
+        <div class="total-equity-val balance-val" id="sidebar-equity">—</div>
+        <div class="total-equity-change" id="sidebar-change">Loading…</div>
+      </div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px">
+        <button class="btn-open-profile" data-action="open-profile-modal" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;border-radius:4px;flex-shrink:0;line-height:1" title="Edit profile">◉</button>
+        <div style="flex:1;min-width:0">
+          <div id="sidebar-name" style="font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+          <div id="user-email" style="display:none;font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+        </div>
+        <button class="btn-signout" data-action="sign-out" style="background:none;border:none;cursor:pointer;font-size:10px;padding:3px 6px;border-radius:4px;flex-shrink:0">Sign out</button>
+      </div>
+      <div class="sidebar-footer-min"><button class="icon-btn" data-action="open-profile-modal" title="Profile">◉</button></div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div id="demo-banner" class="app-banner info" style="display:none">
+      <span>🔍 You're viewing <strong style="color:var(--text)">demo data</strong> — nothing here is saved. Sign in to track your own trades.</span>
+      <button class="btn btn-primary btn-sm" data-action="show-auth-from-demo">Sign In</button>
+    </div>
+    <!-- Shown until sql/migrations/2026-10-26-features.sql has been run -->
+    <div id="migration-banner" class="app-banner warn" style="display:none">
+      <span>⚠ <strong>Database update needed.</strong> Run <code>sql/migrations/2026-10-26-features.sql</code> in Supabase → SQL Editor to turn on funds history, fees, goals, journaling and more. Everything else keeps working.</span>
+    </div>
+    <!-- Daily loss limit reached -->
+    <div id="risk-banner" class="app-banner danger" style="display:none">
+      <span>⛔ <span id="risk-banner-text"></span></span>
+      <button class="btn btn-ghost btn-sm" data-action="show-page" data-page="risk">Risk page</button>
+    </div>
+
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger-btn" data-action="toggle-sidebar" aria-label="Toggle menu">☰</button>
+        <div>
+          <div class="topbar-title" id="page-title">Overview</div>
+          <div class="topbar-crumb" id="page-crumb"></div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <div class="range-picker" title="Date range for stats, charts and the trade log">
+          <select class="form-select" id="range-select" aria-label="Date range">
+            <option value="all">All time</option>
+            <option value="today">Today</option>
+            <option value="7d">Last 7 days</option>
+            <option value="month">This month</option>
+            <option value="30d">Last 30 days</option>
+            <option value="90d">Last 90 days</option>
+            <option value="ytd">Year to date</option>
+            <option value="lastyear">Last year</option>
+            <option value="custom">Custom…</option>
+          </select>
+          <span id="range-custom" style="display:none;gap:4px;align-items:center">
+            <input class="form-input" type="date" id="range-from" aria-label="From">
+            <span style="color:var(--muted)">→</span>
+            <input class="form-input" type="date" id="range-to" aria-label="To">
+          </span>
+        </div>
+        <button class="btn btn-ghost search-btn" data-action="open-command-palette" title="Search pages, actions and trades (Ctrl+K)">
+          <span>⌕ <span class="search-label">Search…</span></span><kbd>Ctrl K</kbd>
+        </button>
+        <button class="btn btn-ghost sync-btn" data-action="sync-bybit" style="font-size:11px" title="Sync Bybit now">⟳ Sync Bybit</button>
+        <span class="last-sync" id="last-sync-label"></span>
+        <div class="menu-wrap">
+          <button class="btn btn-ghost" data-action="toggle-menu" aria-haspopup="menu">+ New ▾</button>
+          <div class="menu" role="menu">
+            <button class="menu-item" data-action="open-add-trade" role="menuitem"><span class="icon">⇄</span>Log trade<kbd>N</kbd></button>
+            <button class="menu-item" data-action="open-add-investment" role="menuitem"><span class="icon">◆</span>Add investment<kbd>I</kbd></button>
+            <div class="menu-sep"></div>
+            <button class="menu-item" data-action="open-funds" data-account="trading" data-kind="deposit" role="menuitem"><span class="icon">＋</span>Deposit<kbd>D</kbd></button>
+            <button class="menu-item" data-action="open-funds" data-account="trading" data-kind="withdraw_bank" role="menuitem"><span class="icon">－</span>Withdraw<kbd>W</kbd></button>
+            <button class="menu-item" data-action="open-funds" data-account="trading" data-kind="transfer" role="menuitem"><span class="icon">⇆</span>Transfer</button>
+            <div class="menu-sep"></div>
+            <button class="menu-item" data-action="open-calculator" role="menuitem"><span class="icon">⊞</span>Position calculator<kbd>C</kbd></button>
+            <button class="menu-item" data-action="open-import" role="menuitem"><span class="icon">↥</span>Import CSV</button>
+            <button class="menu-item" data-action="export-csv" role="menuitem"><span class="icon">↓</span>Export CSV</button>
+            <button class="menu-item" data-action="open-report" role="menuitem"><span class="icon">▤</span>Monthly report</button>
+          </div>
+        </div>
+        <button class="btn btn-primary" data-action="open-add-trade">+ Log Trade</button>
+      </div>
+    </header>
+
+    <!-- Pages are loaded from public/pages/<id>.html -->
+    <div class="content" id="page-root"></div>
+  </main>
+</div>
+
+<!-- Modals are loaded from public/partials/modals/<name>.html -->
+<div id="modal-root"></div>
+
+<!-- Command palette (Ctrl/⌘ + K) -->
+<div class="cmdk-overlay" id="cmdk" role="dialog" aria-modal="true" aria-label="Command palette">
+  <div class="cmdk">
+    <input class="cmdk-input" id="cmdk-input" placeholder="Search pages, actions, trades…" autocomplete="off" spellcheck="false">
+    <div class="cmdk-list" id="cmdk-list" role="listbox"></div>
+    <div class="cmdk-foot"><span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>Enter</kbd> open</span><span><kbd>Esc</kbd> close</span><span style="margin-left:auto"><kbd>?</kbd> all shortcuts</span></div>
+  </div>
+</div>
+
+<!-- Printable monthly report (only visible when printing) -->
+<div id="report-view"></div>
+
+<script src="js/config.js"></script>
+<!-- Load order: core → features → pages → events → init. Everything before
+     init.js only defines things; init.js loads the HTML partials and starts the app. -->
+<!-- core: shared state & services -->
+<script src="js/core/ui.js"></script>
+<script src="js/core/state.js"></script>
+<script src="js/core/demo.js"></script>
+<script src="js/core/helpers.js"></script>
+<script src="js/core/components.js"></script>
+<script src="js/core/auth.js"></script>
+<script src="js/core/api.js"></script>
+<script src="js/core/data.js"></script>
+<script src="js/core/prices.js"></script>
+<script src="js/core/trade-model.js"></script>
+<script src="js/core/stats.js"></script>
+<script src="js/core/balances.js"></script>
+<script src="js/core/charts.js"></script>
+<script src="js/core/range.js"></script>
+<script src="js/core/router.js"></script>
+<!-- features: things you can do -->
+<script src="js/features/fees.js"></script>
+<script src="js/features/trade-form.js"></script>
+<script src="js/features/trade-detail.js"></script>
+<script src="js/features/calculator.js"></script>
+<script src="js/features/csv-export.js"></script>
+<script src="js/features/csv-import.js"></script>
+<script src="js/features/bybit-sync.js"></script>
+<script src="js/features/investments.js"></script>
+<script src="js/features/profile.js"></script>
+<script src="js/features/funds.js"></script>
+<script src="js/features/goals.js"></script>
+<script src="js/features/networth.js"></script>
+<script src="js/features/report.js"></script>
+<script src="js/features/backup.js"></script>
+<script src="js/features/password-reset.js"></script>
+<script src="js/features/command-palette.js"></script>
+<script src="js/features/shortcuts.js"></script>
+<!-- pages: one file per page (+ public/pages/<id>.html) -->
+<script src="js/pages/dashboard.js"></script>
+<script src="js/pages/trades.js"></script>
+<script src="js/pages/analytics.js"></script>
+<script src="js/pages/insights.js"></script>
+<script src="js/pages/risk.js"></script>
+<script src="js/pages/investing.js"></script>
+<script src="js/pages/equity.js"></script>
+<script src="js/pages/networth.js"></script>
+<script src="js/pages/money.js"></script>
+<script src="js/pages/calendar.js"></script>
+<script src="js/pages/yearly.js"></script>
+<script src="js/pages/query.js"></script>
+<script src="js/pages/settings.js"></script>
+<script src="js/pages/schema.js"></script>
+<!-- wiring + start-up — always last -->
+<script src="js/core/events.js"></script>
+<script src="js/core/init.js"></script>
+</body>
+</html>

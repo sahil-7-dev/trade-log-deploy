@@ -1,0 +1,66 @@
+<section class="page" id="page-risk" aria-labelledby="risk-h">
+  <div class="page-header">
+    <div>
+      <h1 id="risk-h">Risk</h1>
+      <p>Drawdowns, consistency over time, how your results spread in R, and what's at risk right now.</p>
+    </div>
+    <div class="page-header-actions">
+      <button class="btn btn-ghost" data-action="show-page" data-page="settings">Limits</button>
+      <button class="btn btn-primary" data-action="open-calculator">⊞ Position size calculator</button>
+    </div>
+  </div>
+
+  <div class="stats-row" id="risk-kpis"></div>
+
+  <div class="grid-2-1">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Drawdown <span class="chart-sub">% below the previous equity high</span></div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:230px"><canvas id="drawdownChart" aria-label="Drawdown over time"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div class="chart-title">Today &amp; limits</div><button class="filter-btn" data-action="show-page" data-page="settings">Edit</button></div>
+      <div id="risk-goals" style="display:flex;flex-direction:column;gap:16px"></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Rolling win rate <span class="chart-sub">last 20 trades</span></div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:200px"><canvas id="rollingWinChart" aria-label="Rolling 20-trade win rate"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Rolling expectancy <span class="chart-sub">avg net P&amp;L, last 20 trades</span></div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:200px"><canvas id="rollingExpChart" aria-label="Rolling 20-trade expectancy"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-1-2">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">R-multiple distribution</div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:230px"><canvas id="rDistChart" aria-label="Trades per R-multiple"></canvas></div>
+    </div>
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-title">Open exposure <span class="chart-sub" id="exposure-meta"></span></div>
+      </div>
+      <div class="table-scroll capped" style="max-height:250px">
+        <table>
+          <thead><tr><th>Symbol</th><th>Dir</th><th>Open size</th><th>% of balance</th><th>Stop</th><th>Risk to stop</th><th>Live P&amp;L</th></tr></thead>
+          <tbody id="exposure-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,63 @@
+<section class="page" id="page-calendar" aria-labelledby="cal-h">
+  <div class="page-header">
+    <div>
+      <h1 id="cal-h">P&amp;L Calendar</h1>
+      <p>Every trading day at a glance — the whole year, then month by month. Click a day for its trades.</p>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Year activity <span class="chart-sub">one square per day</span></div>
+      <div class="chart-tools">
+        <button data-action="cal-year-prev" class="filter-btn" aria-label="Previous year">‹</button>
+        <span id="cal-year-label" class="chart-meta" style="min-width:40px;text-align:center"></span>
+        <button data-action="cal-year-next" class="filter-btn" aria-label="Next year">›</button>
+      </div>
+    </div>
+    <div id="year-heat"></div>
+    <div class="scale-legend"><span>Loss</span><span class="ramp"></span><span>Profit</span></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Month</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button data-action="cal-prev-month" class="filter-btn" aria-label="Previous month">‹</button>
+        <span id="cal-month-label" style="font-family:var(--mono);font-size:12px;font-weight:600;min-width:120px;text-align:center"></span>
+        <button data-action="cal-next-month" class="filter-btn" aria-label="Next month">›</button>
+      </div>
+    </div>
+    <div id="cal-stats-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px"></div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px">
+      <div class="hm-month">SUN</div><div class="hm-month">MON</div><div class="hm-month">TUE</div><div class="hm-month">WED</div>
+      <div class="hm-month">THU</div><div class="hm-month">FRI</div><div class="hm-month">SAT</div>
+    </div>
+    <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px"></div>
+  </div>
+
+  <!-- Clicked day detail -->
+  <div class="table-card" id="cal-day-trades" style="display:none">
+    <div class="table-header"><div class="table-title" id="cal-day-title">Trades</div></div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Symbol</th><th>Direction</th><th>Entry</th><th>Exit</th><th>P&amp;L</th><th>RR</th><th>Status</th></tr></thead>
+        <tbody id="cal-day-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Daily P&L Log — one row per trading day -->
+  <div class="table-card">
+    <div class="table-header">
+      <div class="table-title">Daily P&amp;L log</div>
+      <div class="chart-meta">Each row = one trading day · click to open it</div>
+    </div>
+    <div class="table-scroll capped">
+      <table>
+        <thead><tr><th>Date</th><th>Day</th><th>Trades</th><th>Wins</th><th>Losses</th><th>Daily P&amp;L</th><th>Cumulative</th></tr></thead>
+        <tbody id="daily-pnl-body"></tbody>
+      </table>
+    </div>
+  </div>
+</section>

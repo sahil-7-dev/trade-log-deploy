@@ -1,0 +1,58 @@
+<section class="page" id="page-money" aria-labelledby="money-h">
+  <div class="page-header">
+    <div>
+      <h1 id="money-h">Money</h1>
+      <p>Every deposit, withdrawal, adjustment and transfer — so returns are measured against the money you actually put in.</p>
+    </div>
+    <div class="page-header-actions">
+      <button class="btn btn-ghost" data-action="open-funds" data-account="trading" data-kind="withdraw_bank">－ Withdraw</button>
+      <button class="btn btn-ghost" data-action="open-funds" data-account="trading" data-kind="transfer">⇆ Transfer</button>
+      <button class="btn btn-ghost" data-action="open-funds" data-account="trading" data-kind="adjustment">± Adjust</button>
+      <button class="btn btn-primary" data-action="open-funds" data-account="trading" data-kind="deposit">＋ Deposit</button>
+    </div>
+  </div>
+
+  <div id="money-migration" class="app-banner warn" style="display:none;border-radius:var(--radius);border:1px solid var(--border)">
+    <span>Funds history needs the database update (<code>sql/migrations/2026-10-26-features.sql</code>). Balances still work.</span>
+  </div>
+
+  <div class="stats-row" id="money-kpis"></div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Monthly cash flow <span class="chart-sub">transfers between your accounts excluded</span></div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:240px"><canvas id="cashFlowChart" aria-label="Monthly money in and out"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Net deposits over time</div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:240px"><canvas id="netDepositsChart" aria-label="Cumulative net deposits"></canvas></div>
+    </div>
+  </div>
+
+  <div class="table-card" id="funds-card">
+    <div class="table-header">
+      <div class="table-title">Funds history <span class="chart-sub" id="money-count"></span></div>
+      <div class="table-filters">
+        <select class="form-select" id="money-f-account" style="width:auto;padding:5px 8px;font-size:11px" aria-label="Account">
+          <option value="">Both accounts</option><option value="trading">Trading</option><option value="investing">Investing cash</option>
+        </select>
+        <select class="form-select" id="money-f-kind" style="width:auto;padding:5px 8px;font-size:11px" aria-label="Type">
+          <option value="">All types</option><option value="deposit">Deposits</option><option value="withdraw_bank">Withdrawn to bank</option>
+          <option value="withdraw_removed">Removed</option><option value="adjustment">Adjustments</option><option value="transfer">Transfers</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-scroll capped" style="max-height:420px">
+      <table>
+        <thead><tr><th>Date</th><th>Account</th><th>Type</th><th>Amount</th><th>Note</th><th></th></tr></thead>
+        <tbody id="funds-body"></tbody>
+      </table>
+    </div>
+  </div>
+</section>

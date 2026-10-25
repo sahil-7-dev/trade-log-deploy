@@ -1,0 +1,106 @@
+<!-- TRADE MODAL -->
+<div class="modal-overlay" id="trade-modal">
+  <div class="modal">
+    <div class="modal-title" id="trade-modal-title">Log New Trade</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Symbol</label>
+        <input class="form-input" placeholder="BTC/USDT, EUR/USD, AAPL…" id="t-symbol">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Asset Type</label>
+        <select class="form-select" id="t-type">
+          <option>Crypto</option><option>Forex</option><option>Stocks</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Direction</label>
+        <select class="form-select" id="t-dir">
+          <option>Long</option><option>Short</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input class="form-input" type="date" id="t-date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Entry Price</label>
+        <input class="form-input" type="number" placeholder="0.00" id="t-entry">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Exit Price</label>
+        <input class="form-input" type="number" placeholder="Leave blank if open" id="t-exit">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Position Size ($)</label>
+        <input class="form-input" type="number" placeholder="0.00" id="t-size">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Stop Loss</label>
+        <input class="form-input" type="number" placeholder="0.00" id="t-sl">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Take Profit</label>
+        <input class="form-input" type="number" placeholder="0.00" id="t-tp">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Setup / Strategy</label>
+        <input class="form-input" placeholder="Breakout, EMA cross…" id="t-setup" list="setup-suggestions">
+        <datalist id="setup-suggestions"></datalist>
+      </div>
+      <div class="form-group needs-db" id="t-buy-fee-group">
+        <label class="form-label" for="t-buy-fee">Buy fee ($)</label>
+        <input class="form-input" type="number" step="0.01" placeholder="0.00" id="t-buy-fee">
+      </div>
+      <div class="form-group needs-db" id="t-sell-fee-group">
+        <label class="form-label" for="t-sell-fee">Sell fee ($)</label>
+        <input class="form-input" type="number" step="0.01" placeholder="0.00" id="t-sell-fee">
+      </div>
+      <div class="form-group needs-db" id="t-fees-group">
+        <label class="form-label" for="t-fees">Fees ($)</label>
+        <input class="form-input" type="number" placeholder="0.00 — exchange + funding" id="t-fees">
+      </div>
+      <div class="needs-db fee-hint" id="t-fee-hint" style="grid-column:1 / -1;font-size:11px;color:var(--muted);margin-top:-6px"></div>
+      <div class="form-group needs-db">
+        <label class="form-label">Opened at</label>
+        <input class="form-input" type="datetime-local" id="t-opened-at">
+      </div>
+      <div class="form-group needs-db">
+        <label class="form-label">Closed at <span style="text-transform:none;letter-spacing:0">(if closed)</span></label>
+        <input class="form-input" type="datetime-local" id="t-closed-at">
+      </div>
+      <div class="form-group needs-db">
+        <label class="form-label">Followed my plan?</label>
+        <select class="form-select" id="t-followed">
+          <option value="">—</option><option value="true">Yes</option><option value="false">No</option>
+        </select>
+      </div>
+      <div class="form-group needs-db">
+        <label class="form-label">Emotion</label>
+        <select class="form-select" id="t-emotion">
+          <option value="">—</option>
+          <option>Calm</option><option>Confident</option><option>Patient</option>
+          <option>FOMO</option><option>Fearful</option><option>Greedy</option>
+          <option>Impatient</option><option>Revenge</option><option>Bored</option><option>Tired</option>
+        </select>
+      </div>
+      <div class="form-group full needs-db">
+        <label class="form-label">Mistakes <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(comma separated)</span></label>
+        <input class="form-input" placeholder="Moved stop loss, Chased entry, Oversized, Early exit, No plan…" id="t-mistakes">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Tags <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(comma separated)</span></label>
+        <input class="form-input" placeholder="scalp, swing, breakout, revenge…" id="t-tags">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Notes</label>
+        <textarea class="form-textarea" id="t-notes" placeholder="What was your reasoning? What happened?"></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="close-modal" data-modal="trade-modal">Cancel</button>
+      <button class="btn btn-primary" id="log-trade-btn" data-action="save-trade">Log Trade</button>
+    </div>
+    <input type="hidden" id="t-edit-id">
+  </div>
+</div>

@@ -1,0 +1,54 @@
+<section class="page" id="page-yearly" aria-labelledby="yr-h">
+  <div class="page-header">
+    <div>
+      <h1 id="yr-h">Year in review</h1>
+      <p>Pick a year to see it on its own — same stats engine as the dashboard, so the numbers always agree.</p>
+    </div>
+    <div class="page-header-actions">
+      <select class="form-select" id="yr-year-select" style="width:120px" aria-label="Year"></select>
+      <button class="btn btn-ghost" data-action="open-report">▤ Monthly report</button>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-label">Total P&amp;L</div><div class="stat-val green" id="yr-pnl">—</div><div class="stat-sub" id="yr-pnl-sub">—</div></div>
+    <div class="stat-card"><div class="stat-label">Win rate</div><div class="stat-val green" id="yr-winrate">—</div><div class="stat-sub" id="yr-winrate-sub">—</div></div>
+    <div class="stat-card"><div class="stat-label">Avg RR achieved</div><div class="stat-val blue" id="yr-rr">—</div><div class="stat-sub" id="yr-rr-sub">—</div></div>
+    <div class="stat-card"><div class="stat-label">Expectancy</div><div class="stat-val" id="yr-expect">—</div><div class="stat-sub">Per trade avg</div></div>
+    <div class="stat-card"><div class="stat-label">Best trade</div><div class="stat-val green" id="yr-best">—</div><div class="stat-sub" id="yr-best-sym">—</div></div>
+    <div class="stat-card"><div class="stat-label">Worst trade</div><div class="stat-val red" id="yr-worst">—</div><div class="stat-sub" id="yr-worst-sym">—</div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Monthly net P&amp;L</div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:220px"><canvas id="yrMonthlyChart" aria-label="Monthly net P&L for the year"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Cumulative through the year</div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:220px"><canvas id="yrCumChart" aria-label="Cumulative P&L through the year"></canvas></div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Monthly heatmap</div>
+      <div class="scale-legend" style="margin:0"><span>Loss</span><span class="ramp"></span><span>Profit</span></div>
+    </div>
+    <div class="heatmap-scroll">
+      <div class="hm-months">
+        <div class="hm-month">JAN</div><div class="hm-month">FEB</div><div class="hm-month">MAR</div>
+        <div class="hm-month">APR</div><div class="hm-month">MAY</div><div class="hm-month">JUN</div>
+        <div class="hm-month">JUL</div><div class="hm-month">AUG</div><div class="hm-month">SEP</div>
+        <div class="hm-month">OCT</div><div class="hm-month">NOV</div><div class="hm-month">DEC</div>
+      </div>
+      <div class="heatmap-grid" id="yearly-heatmap"></div>
+    </div>
+  </div>
+</section>

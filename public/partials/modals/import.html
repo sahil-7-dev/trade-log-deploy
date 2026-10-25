@@ -1,0 +1,41 @@
+<!-- CSV IMPORT -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal" style="width:760px">
+    <div class="modal-title">Import Trades from CSV</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.6">
+      Works with TradeLog's own export and most exchange / spreadsheet exports. Columns are matched automatically — check them below.
+      Trades already in your journal (same date, symbol, direction, entry, exit and size) are skipped.
+    </div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <input type="file" id="import-file" accept=".csv,text/csv" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date format (for dd/mm vs mm/dd)</label>
+        <select class="form-select" id="import-date-format">
+          <option value="dmy">Day first — 25/10/2026</option>
+          <option value="mdy">Month first — 10/25/2026</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Asset type if not in file</label>
+        <select class="form-select" id="import-default-type"><option>Crypto</option><option>Forex</option><option>Stocks</option></select>
+      </div>
+      <div class="form-group full">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="import-dir-closing"> Direction column is the <em>closing</em> side (Sell closes a Long — e.g. Bybit's closed P&L export)
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-top:6px">
+          <input type="checkbox" id="import-add-balance"> Add the imported trades' P&L to my trading balance
+        </label>
+      </div>
+    </div>
+    <div class="form-grid import-mapping" id="import-mapping" style="margin-top:14px;grid-template-columns:repeat(4,1fr)"></div>
+    <div id="import-summary" style="font-size:11px;color:var(--amber);margin:14px 0 8px;font-family:var(--mono)"></div>
+    <div id="import-preview" style="overflow:auto"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="close-modal" data-modal="import-modal">Cancel</button>
+      <button class="btn btn-primary" id="import-submit" data-action="submit-import" disabled>Import</button>
+    </div>
+  </div>
+</div>

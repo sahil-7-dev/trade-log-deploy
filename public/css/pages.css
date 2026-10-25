@@ -1,0 +1,122 @@
+/* Page- and feature-specific styles */
+
+/* ─── Auth screen ─────────────────────────────────────────────────────── */
+#auth-screen { background: radial-gradient(80% 60% at 50% 0%, rgba(0, 212, 170, 0.08), transparent 70%), var(--bg); }
+.auth-card { box-shadow: var(--shadow-2); }
+
+/* ─── Top bar controls ────────────────────────────────────────────────── */
+.range-picker { display: flex; align-items: center; gap: 6px; }
+.range-picker .form-select, .range-picker .form-input { padding: 6px 8px; font-size: 11px; width: auto; }
+.sync-btn { position: relative; }
+.sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+.sync-dot.live { background: var(--green); box-shadow: 0 0 0 3px var(--green-dim); }
+.last-sync { font-family: var(--mono); font-size: 9.5px; color: var(--muted); white-space: nowrap; }
+.search-btn { min-width: 170px; justify-content: space-between; color: var(--muted); }
+.search-btn kbd { margin-left: 12px; }
+
+/* ─── Trade Log ───────────────────────────────────────────────────────── */
+/* Row actions stay pinned to the right edge while the wide table scrolls */
+#page-trades tbody td:last-child, #page-trades thead th:last-child { position: sticky; right: 0; background: var(--surface); z-index: 1; box-shadow: -8px 0 12px -10px rgba(0, 0, 0, 0.8); }
+#page-trades tbody tr:hover td:last-child { background: var(--surface2); }
+#page-trades tbody td, #page-trades thead th { padding-left: 11px; padding-right: 11px; }
+.balance-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-content: center; padding: 12px; }
+.balance-actions .btn { font-size: 11px; padding: 7px 8px; }
+
+/* ─── Portfolio holdings ──────────────────────────────────────────────── */
+.holding-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); transition: background 0.1s; }
+.holding-row:hover { background: var(--surface2); }
+.holding-row:last-child { border-bottom: none; }
+.holding-icon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font: 700 12px var(--mono); flex-shrink: 0; }
+.holding-info { flex: 1; min-width: 0; }
+.holding-name { font-size: 12.5px; font-weight: 600; }
+.holding-qty { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+.holding-vals { text-align: right; }
+.holding-val { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+.holding-ret { font-family: var(--mono); font-size: 10px; margin-top: 2px; }
+.alloc-row { display: grid; grid-template-columns: 70px 1fr 64px; gap: 10px; align-items: center; font-size: 11.5px; padding: 5px 0; }
+.alloc-row .bar-track { height: 8px; }
+
+/* ─── Goals / limits ──────────────────────────────────────────────────── */
+.goals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.goal-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; color: var(--muted); margin-bottom: 8px; gap: 8px; }
+.goal-head .mono { font-size: 13px; font-weight: 700; }
+.goal-sub { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 6px; }
+
+/* ─── Trade detail panel ──────────────────────────────────────────────── */
+.detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 16px; }
+.detail-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+.detail-value { font-family: var(--mono); font-size: 12px; margin-top: 3px; }
+#td-title { display: flex; align-items: center; gap: 8px; }
+
+/* ─── Position size calculator ────────────────────────────────────────── */
+.calc-result { margin-top: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 12px; }
+.calc-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--border); }
+.calc-row:last-child { border-bottom: none; }
+.calc-row span:first-child { color: var(--muted); }
+
+/* ─── Settings page ───────────────────────────────────────────────────── */
+.settings-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 20px; align-items: start; }
+.settings-nav { position: sticky; top: 0; display: flex; flex-direction: column; gap: 2px; }
+.settings-nav a { padding: 8px 12px; border-radius: 8px; color: var(--muted); text-decoration: none; font-size: 12.5px; }
+.settings-nav a:hover { background: var(--surface2); color: var(--text); }
+.settings-section { scroll-margin-top: 10px; }
+.settings-section h2 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.settings-section > p { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+.settings-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ─── P&L calendar ────────────────────────────────────────────────────── */
+.cal-cell {
+  height: 74px; border-radius: 8px; padding: 6px 7px; font-family: var(--mono); cursor: pointer;
+  transition: transform 0.1s, outline 0.1s; display: flex; flex-direction: column; justify-content: space-between;
+}
+.cal-cell:hover { transform: scale(1.03); outline: 1px solid var(--border-strong); }
+.cal-cell.active-day { outline: 2px solid var(--green) !important; }
+.cal-cell-date { font-size: 9px; opacity: 0.75; }
+.cal-cell-pnl { font-size: 10px; font-weight: 700; }
+.cal-cell-trades { font-size: 8px; opacity: 0.65; }
+.cal-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+.cal-stat-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+.cal-stat-val { font-family: var(--mono); font-size: 15px; font-weight: 700; margin-top: 3px; }
+
+/* ─── Query builder ───────────────────────────────────────────────────── */
+.condition-row { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; flex-wrap: wrap; }
+.condition-row select, .condition-row input { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text); font: 11px var(--mono); outline: none; }
+.condition-row select:focus, .condition-row input:focus { border-color: var(--green); }
+.condition-row .logic-badge { font: 700 9px var(--mono); color: var(--amber); background: var(--amber-dim); padding: 3px 7px; border-radius: 4px; letter-spacing: 0.5px; min-width: 32px; text-align: center; }
+.remove-cond { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; margin-left: auto; }
+.remove-cond:hover { color: var(--red); }
+.preset-chip { padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); transition: all 0.15s; white-space: nowrap; }
+.preset-chip:hover { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+
+/* ─── Schema page ─────────────────────────────────────────────────────── */
+.schema-col { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 11px; }
+.schema-col:last-child { border-bottom: none; }
+.col-name { font-family: var(--mono); font-weight: 600; min-width: 130px; }
+.col-type { font: 10px var(--mono); color: var(--blue); min-width: 90px; }
+.col-desc { color: var(--muted); font-size: 10px; }
+.col-pk { font: 8px var(--mono); color: var(--amber); background: var(--amber-dim); padding: 2px 5px; border-radius: 3px; }
+.example-q { background: var(--bg); border-radius: 8px; padding: 12px 14px; }
+.example-q-label { font-size: 10px; color: var(--muted); margin-bottom: 6px; }
+.example-q pre { font: 11px var(--mono); color: var(--green); white-space: pre-wrap; line-height: 1.6; }
+
+/* ─── Profile avatar ──────────────────────────────────────────────────── */
+.avatar-photo-overlay { opacity: 0; transition: opacity 0.15s; }
+#profile-avatar-preview:hover .avatar-photo-overlay { opacity: 1; }
+
+.import-mapping .form-select { padding: 6px 8px; font-size: 11px; }
+
+@media (max-width: 1100px) {
+  .goals-grid { grid-template-columns: 1fr; gap: 14px; }
+  .settings-layout { grid-template-columns: 1fr; }
+  .settings-nav { position: static; flex-direction: row; flex-wrap: wrap; }
+}
+@media (max-width: 768px) {
+  .range-picker { flex: 1 1 100%; flex-wrap: wrap; }
+  .search-btn { min-width: 0; }
+  .search-btn .search-label, .search-btn kbd { display: none; }
+  .detail-grid { grid-template-columns: 1fr 1fr; }
+  .import-mapping { grid-template-columns: 1fr 1fr !important; }
+  #cal-stats-row, #cp-pnl-preview { grid-template-columns: repeat(2, 1fr) !important; }
+  .cal-cell { font-size: 10px !important; padding: 4px !important; height: 60px; }
+  .auth-card { padding: 22px !important; }
+}

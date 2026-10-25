@@ -1,0 +1,121 @@
+<section class="page" id="page-settings" aria-labelledby="set-h">
+  <div class="page-header">
+    <div>
+      <h1 id="set-h">Settings</h1>
+      <p>Goals and limits, sync, display and everything about your data.</p>
+    </div>
+    <div class="page-header-actions">
+      <button class="btn btn-primary" data-action="save-settings">Save settings</button>
+    </div>
+  </div>
+
+  <div class="settings-layout">
+    <nav class="settings-nav" aria-label="Settings sections">
+      <a href="#/settings" data-action="scroll-to" data-target="set-goals">Goals &amp; limits</a>
+      <a href="#/settings" data-action="scroll-to" data-target="set-fees">Trading fees</a>
+      <a href="#/settings" data-action="scroll-to" data-target="set-sync">Bybit sync</a>
+      <a href="#/settings" data-action="scroll-to" data-target="set-display">Display</a>
+      <a href="#/settings" data-action="scroll-to" data-target="set-data">Your data</a>
+      <a href="#/settings" data-action="scroll-to" data-target="set-account">Account</a>
+      <a href="#/settings" data-action="scroll-to" data-target="set-database">Database</a>
+    </nav>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card settings-section" id="set-goals">
+        <h2>Goals &amp; limits</h2>
+        <p>Shown on the Overview and Risk pages. When today's losses reach the limit, a red banner appears on every page.</p>
+        <div class="form-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="form-group">
+            <label class="form-label" for="set-target">Monthly profit target ($)</label>
+            <input class="form-input" type="number" id="set-target" placeholder="e.g. 500">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="set-loss-limit">Daily loss limit ($)</label>
+            <input class="form-input" type="number" id="set-loss-limit" placeholder="e.g. 100">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="set-risk">Risk per trade (%)</label>
+            <input class="form-input" type="number" id="set-risk" step="0.1" placeholder="e.g. 1">
+          </div>
+        </div>
+      </div>
+
+      <div class="card settings-section" id="set-fees">
+        <h2>Trading fees</h2>
+        <p>Your exchange's fee rates, as a % of the trade's value. They fill in automatically when you log or close a trade by hand —
+          a Long buys on entry and sells on exit, a Short sells on entry and buys back on exit. You can still edit the fee on any trade.
+          Changing these affects trades you log from now on; earlier trades keep the fees they were saved with. Bybit-synced trades always use Bybit's actual fees.</p>
+        <div class="form-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="form-group">
+            <label class="form-label" for="set-fee-buy">Buy fee (%)</label>
+            <input class="form-input" type="number" id="set-fee-buy" step="0.001" min="0" placeholder="e.g. 0.04">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="set-fee-sell">Sell fee (%)</label>
+            <input class="form-input" type="number" id="set-fee-sell" step="0.001" min="0" placeholder="e.g. 0.02">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Example</label>
+            <div class="chart-meta" id="set-fee-example" style="padding-top:8px">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card settings-section" id="set-sync">
+        <h2>Bybit sync</h2>
+        <p>Trades sync from Bybit when you press Sync, and — with auto-sync on — whenever the app is open (every 3 minutes, and when you come back to the tab).</p>
+        <label class="checkbox-row"><input type="checkbox" id="set-autosync"> Auto-sync Bybit while the app is open</label>
+        <div class="settings-actions" style="margin-top:12px;align-items:center">
+          <button class="btn btn-ghost btn-sm" data-action="sync-bybit">⟳ Sync now</button>
+          <span class="chart-meta" id="set-sync-status"></span>
+        </div>
+      </div>
+
+      <div class="card settings-section" id="set-display">
+        <h2>Display</h2>
+        <p>Remembered on this device.</p>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <span class="form-label" style="min-width:110px">Currency</span>
+            <div class="segmented" role="group" aria-label="Currency">
+              <button data-action="set-currency" data-currency="USD">$ USD</button>
+              <button data-action="set-currency" data-currency="INR">₹ INR</button>
+            </div>
+            <span class="chart-meta" id="set-fx"></span>
+          </div>
+          <label class="checkbox-row"><input type="checkbox" id="set-hide-balances"> Hide balances (blur every amount) <kbd>H</kbd></label>
+          <label class="checkbox-row"><input type="checkbox" id="set-compact"> Compact sidebar (icons only) <kbd>[</kbd></label>
+          <div><button class="btn btn-ghost btn-sm" data-action="open-shortcuts">⌨ Keyboard shortcuts</button></div>
+        </div>
+      </div>
+
+      <div class="card settings-section" id="set-data">
+        <h2>Your data</h2>
+        <p>Your data stays in your own Supabase project. Take a full backup any time.</p>
+        <div class="settings-actions">
+          <button class="btn btn-ghost" data-action="download-backup">↓ Full backup (JSON)</button>
+          <button class="btn btn-ghost" data-action="export-csv">↓ Trades CSV</button>
+          <button class="btn btn-ghost" data-action="open-import">↥ Import CSV</button>
+          <button class="btn btn-ghost" data-action="open-report">▤ Monthly report (PDF)</button>
+        </div>
+      </div>
+
+      <div class="card settings-section" id="set-account">
+        <h2>Account</h2>
+        <p id="set-account-email">—</p>
+        <div class="settings-actions">
+          <button class="btn btn-ghost" data-action="open-profile-modal">◉ Edit profile &amp; photo</button>
+          <button class="btn btn-ghost" data-action="sign-out" style="color:var(--red)">Sign out</button>
+        </div>
+      </div>
+
+      <div class="card settings-section" id="set-database">
+        <h2>Database</h2>
+        <p>Status: <span id="set-db-status">—</span></p>
+        <div class="settings-actions">
+          <button class="btn btn-ghost" data-action="show-page" data-page="schema">⛁ View schema &amp; setup SQL</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,43 @@
+<!-- INVEST MODAL -->
+<div class="modal-overlay" id="invest-modal">
+  <div class="modal">
+    <div class="modal-title" id="invest-modal-title">Add Investment</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Asset</label>
+        <input class="form-input" placeholder="BTC, AAPL, GOLD…" id="i-symbol">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Type</label>
+        <select class="form-select" id="i-type">
+          <option>Crypto</option><option>Stocks</option><option>ETF</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Buy Date</label>
+        <input class="form-input" type="date" id="i-date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Qty / Units</label>
+        <input class="form-input" type="number" placeholder="0.00" id="i-qty">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Avg Buy Price ($)</label>
+        <input class="form-input" type="number" placeholder="0.00" id="i-price">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Current Price ($)</label>
+        <input class="form-input" type="number" placeholder="0.00" id="i-cur">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Notes</label>
+        <textarea class="form-textarea" id="i-notes" placeholder="Investment thesis…"></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="close-modal" data-modal="invest-modal">Cancel</button>
+      <button class="btn btn-primary" id="add-invest-btn" data-action="save-investment">Add Holding</button>
+    </div>
+    <input type="hidden" id="i-edit-id">
+  </div>
+</div>

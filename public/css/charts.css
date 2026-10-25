@@ -1,0 +1,65 @@
+/* Charts: cards, legends, table view, heatmaps, metric tiles */
+.chart-card { padding: 16px; min-width: 0; }
+.chart-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.chart-title { font-size: 12.5px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.chart-sub { font-size: 11px; color: var(--muted); font-weight: 400; }
+.chart-meta { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.chart-tools { display: flex; align-items: center; gap: 8px; }
+.chart-wrap { position: relative; }
+/* Every chart has a table twin (accessibility + exact values) */
+.chart-table { display: none; max-height: 260px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+.chart-card.show-table .chart-table { display: block; }
+.chart-card.show-table .chart-wrap { display: none; }
+.chart-table table { min-width: 0 !important; }
+.chart-table td, .chart-table th { padding: 6px 10px; font-size: 11px; }
+.chart-toggle { font-size: 10px; padding: 3px 8px; }
+.chart-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 12px; text-align: center; pointer-events: none; }
+
+/* Legend (HTML, under/above a chart) — the swatch mirrors the mark */
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 11px; color: var(--text-2); margin-top: 10px; }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.legend-line { width: 14px; height: 2px; border-radius: 2px; }
+.legend-rect { width: 9px; height: 9px; border-radius: 2px; }
+
+/* ─── Monthly heatmap (12 cells) ──────────────────────────────────────── */
+.heatmap-scroll { overflow-x: auto; }
+.heatmap-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 5px; margin-top: 8px; }
+.heatmap-cell {
+  aspect-ratio: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+  font: 600 9px var(--mono); cursor: default; transition: transform 0.1s; outline: 2px solid transparent;
+}
+.heatmap-cell:hover { transform: scale(1.06); outline-color: var(--border-strong); }
+.hm-months { display: grid; grid-template-columns: repeat(12, 1fr); gap: 5px; margin-top: 4px; }
+.hm-month { font-size: 8.5px; color: var(--muted); text-align: center; }
+
+/* ─── Year activity heatmap (53 weeks × 7 days) ───────────────────────── */
+.year-heat { display: grid; grid-template-columns: 26px 1fr; gap: 6px; }
+.year-heat-days { display: grid; grid-template-rows: repeat(7, 1fr); gap: 3px; font-size: 8.5px; color: var(--muted); }
+.year-heat-days span { line-height: 12px; height: 12px; }
+.year-heat-grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 12px); grid-auto-columns: 12px; gap: 3px; overflow-x: auto; padding-bottom: 4px; }
+.year-cell { width: 12px; height: 12px; border-radius: 3px; background: var(--chart-neutral); outline: 1px solid transparent; }
+.year-cell:hover { outline-color: var(--text-2); }
+.year-cell.empty { background: transparent; }
+.year-heat-months { display: flex; font-size: 8.5px; color: var(--muted); margin: 0 0 4px 32px; gap: 0; }
+
+/* ─── Weekday × hour heatmap ──────────────────────────────────────────── */
+.wh-grid { display: grid; grid-template-columns: 34px repeat(24, minmax(14px, 1fr)); gap: 3px; align-items: center; min-width: 520px; }
+.wh-label { font-size: 9.5px; color: var(--muted); }
+.wh-hour { font-size: 8.5px; color: var(--muted); text-align: center; }
+.wh-cell { height: 20px; border-radius: 3px; background: var(--chart-neutral); outline: 1px solid transparent; }
+.wh-cell:hover { outline-color: var(--text-2); }
+
+/* Diverging scale legend: loss ← neutral → profit */
+.scale-legend { display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--muted); margin-top: 10px; }
+.scale-legend .ramp { width: 140px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--chart-loss), var(--chart-neutral), var(--chart-profit)); }
+
+/* ─── Metric tiles (advanced metrics) ─────────────────────────────────── */
+.metrics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.metric { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; cursor: help; transition: border-color 0.15s; }
+.metric:hover { border-color: var(--border-strong); }
+.metric-val { font-family: var(--mono); font-size: 15px; font-weight: 700; margin-top: 4px; }
+
+@media (max-width: 768px) {
+  .heatmap-grid, .hm-months { min-width: 560px; }
+  .metrics-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+}

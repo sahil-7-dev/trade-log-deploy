@@ -1,0 +1,58 @@
+<section class="page" id="page-networth" aria-labelledby="nw-h">
+  <div class="page-header">
+    <div>
+      <h1 id="nw-h">Net Worth</h1>
+      <p>Trading and investing together — what you own right now, and how much of it is gains (realized and on paper) versus money you put in.</p>
+    </div>
+    <div class="page-header-actions">
+      <button class="btn btn-ghost" data-action="open-funds" data-account="trading" data-kind="withdraw_bank">－ Withdraw</button>
+      <button class="btn btn-primary" data-action="open-funds" data-account="trading" data-kind="deposit">＋ Deposit</button>
+    </div>
+  </div>
+
+  <!-- Hero: total net worth -->
+  <div class="hero-card" id="nw-hero"></div>
+
+  <div class="stats-row" id="nw-kpis"></div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Where your money is</div>
+        <span class="chart-meta" id="nw-where-meta"></span>
+      </div>
+      <div id="nw-where"></div>
+      <table style="margin-top:16px">
+        <tbody id="nw-breakdown"></tbody>
+      </table>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Gains <span class="chart-sub">realized = locked in · unrealized = on paper</span></div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th></th><th>Realized</th><th>Unrealized</th><th>Total</th></tr></thead>
+          <tbody id="nw-gains-table"></tbody>
+        </table>
+      </div>
+      <div class="goal-sub" id="nw-gains-note" style="margin-top:12px;line-height:1.6"></div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">From money put in to net worth</div>
+      <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+    </div>
+    <div class="chart-wrap" style="height:260px"><canvas id="nwBridgeChart" aria-label="Money put in, each kind of gain, and net worth"></canvas></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Net worth over time <span class="chart-sub" id="nw-history-meta"></span></div>
+      <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+    </div>
+    <div class="chart-wrap" style="height:260px"><canvas id="nwHistoryChart" aria-label="Net worth and money put in over time"></canvas></div>
+  </div>
+</section>

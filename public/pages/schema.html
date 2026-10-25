@@ -1,0 +1,32 @@
+<section class="page" id="page-schema" aria-labelledby="schema-h">
+  <div class="page-header">
+    <div>
+      <h1 id="schema-h">Database Schema</h1>
+      <p>The Supabase tables behind TradeLog. Copy the SQL to set up a fresh database.</p>
+    </div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Supabase Schema — Setup Guide</div>
+      <button class="btn btn-ghost" data-action="copy-schema" style="font-size:10px;padding:4px 10px">Copy SQL</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6">Run this in your Supabase SQL Editor to set up TradeLog. Creates all tables, indexes for fast querying, and row-level security so only you can see your data.</p>
+    <pre id="schema-sql" style="font-family:var(--mono);font-size:11px;color:var(--text);background:var(--bg);padding:16px;border-radius:8px;overflow-x:auto;line-height:1.8;white-space:pre-wrap"></pre>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-header"><div class="chart-title">Table: trades</div></div>
+      <div id="schema-trades-cols"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div class="chart-title">Table: investments</div></div>
+      <div id="schema-invest-cols"></div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header"><div class="chart-title">Example Queries</div></div>
+    <div style="display:flex;flex-direction:column;gap:12px" id="example-queries"></div>
+  </div>
+</section>

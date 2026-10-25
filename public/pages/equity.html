@@ -1,0 +1,55 @@
+<section class="page" id="page-equity" aria-labelledby="eq-h">
+  <div class="page-header">
+    <div>
+      <h1 id="eq-h">Equity</h1>
+      <p>How your trading account has grown — including every deposit and withdrawal — and your return on the money you put in.</p>
+    </div>
+  </div>
+
+  <div class="stats-row" style="grid-template-columns:repeat(4,1fr)">
+    <div class="stat-card"><div class="stat-label">Overall equity</div><div class="stat-val green" id="ov-equity">—</div><div class="stat-sub">Trading + investing</div></div>
+    <div class="stat-card"><div class="stat-label">Trading return</div><div class="stat-val" id="ov-return">—</div><div class="stat-sub" id="ov-return-sub">—</div></div>
+    <div class="stat-card"><div class="stat-label">Max drawdown</div><div class="stat-val red" id="ov-dd">—</div><div class="stat-sub">Peak to trough</div></div>
+    <div class="stat-card"><div class="stat-label">Closed trades</div><div class="stat-val blue" id="ov-trades">—</div><div class="stat-sub" id="ov-meta">In period</div></div>
+  </div>
+
+  <!-- Trading account: money in/out and return on it -->
+  <div class="grid-3">
+    <div class="stat-card"><div class="stat-label">Money put in</div><div class="stat-val" id="ov-capital">—</div><div class="stat-sub">Starting funds + deposits + transfers in</div></div>
+    <div class="stat-card"><div class="stat-label">Taken out</div><div class="stat-val amber" id="ov-withdrawn">—</div><div class="stat-sub">Withdrawals + transfers out</div></div>
+    <div class="stat-card"><div class="stat-label">Return on capital</div><div class="stat-val" id="ov-roc">—</div><div class="stat-sub">All-time net P&amp;L ÷ money put in</div></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Trading account balance <span class="chart-sub">▲ money in · ▼ money out</span></div>
+      <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+    </div>
+    <div class="chart-wrap" style="height:260px"><canvas id="balanceChart" aria-label="Trading account balance"></canvas></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Equity curve <span class="chart-sub">cumulative net P&amp;L in period</span></div>
+      <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+    </div>
+    <div class="chart-wrap" style="height:240px"><canvas id="overallEquityChart" aria-label="Equity curve"></canvas></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Monthly P&amp;L <span class="chart-sub" id="equity-year"></span></div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:200px"><canvas id="yearlyChart" aria-label="Monthly P&L this year"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Cumulative P&amp;L by month</div>
+        <button class="filter-btn chart-toggle" data-action="toggle-chart-table">⊞ Table</button>
+      </div>
+      <div class="chart-wrap" style="height:200px"><canvas id="monthlyRetChart" aria-label="Cumulative P&L by month"></canvas></div>
+    </div>
+  </div>
+</section>
