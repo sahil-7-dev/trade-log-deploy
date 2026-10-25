@@ -1,0 +1,18 @@
+{
+  "name": "tradelog",
+  "version": "1.0.0",
+  "description": "Personal trading journal and portfolio tracker with real-time crypto prices, P&L analytics, and Supabase-backed persistence.",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.js",
+    "dev": "npx serve public -l 3000",
+    "start": "npx serve public -l 3000",
+    "test": "node tests/bybit-sync.test.js",
+    "test:e2e": "node tests/run-e2e.js smoke.js && node tests/run-e2e.js pre-migration.js",
+    "test:sql": "node tests/sql-migration.test.mjs"
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@electric-sql/pglite": "0.2.17"
+  }
+}
